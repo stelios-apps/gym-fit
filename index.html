@@ -660,12 +660,15 @@ function renderEditor() {
       <button class="add-set w-full mt-3 py-2.5 bg-[#1c1c1f] rounded-xl text-brand-light text-xs font-bold">+ Προσθήκη σετ</button></div>`;
   }).join('') + (R ? '' : '<button class="cancel-wk w-full text-center text-sm text-red-500 py-4">Ακύρωση προπόνησης</button>');
 }
+const prevLine = p => p ? `Προηγ. φορά: <b class="text-gray-300">${p.kg} kg × ${p.reps} επαν.</b>` : 'Προηγ. φορά: —';
 function setRow(ex, s, i, R, h) {
   const p = h && h.sets[i], d = s.done && !R;
-  return `<div class="set-row flex items-center gap-2 ${d ? 'opacity-40' : ''}" data-set="${s.id}"><button class="rm-set w-7 text-center text-gray-500 font-bold text-sm">${i + 1}</button>
-    <input type="number" inputmode="decimal" step="0.5" class="kg inp text-center font-semibold" placeholder="${p ? p.kg : '-'}" value="${s.kg}" ${d ? 'disabled' : ''}>
-    <input type="number" inputmode="numeric" class="reps inp text-center font-semibold" placeholder="${p ? p.reps : '-'}" value="${s.reps}" ${d ? 'disabled' : ''}>
-    ${R ? '' : `<input type="checkbox" class="set-checkbox chk" ${d ? 'checked' : ''} ${(!s.kg || !s.reps) && !d ? 'disabled' : ''}>`}</div>`;
+  return `<div class="set-row ${d ? 'opacity-40' : ''}" data-set="${s.id}">
+    <div class="flex items-center gap-2"><button class="rm-set w-7 text-center text-gray-500 font-bold text-sm">${i + 1}</button>
+      <input type="number" inputmode="decimal" step="0.5" class="kg inp text-center font-semibold" placeholder="${p ? p.kg : '-'}" value="${s.kg}" ${d ? 'disabled' : ''}>
+      <input type="number" inputmode="numeric" class="reps inp text-center font-semibold" placeholder="${p ? p.reps : '-'}" value="${s.reps}" ${d ? 'disabled' : ''}>
+      ${R ? '' : `<input type="checkbox" class="set-checkbox chk" ${d ? 'checked' : ''} ${(!s.kg || !s.reps) && !d ? 'disabled' : ''}>`}</div>
+    ${R ? '' : `<div class="prev-line text-[11px] text-gray-500 pl-9 mt-1">${prevLine(p)}</div>`}</div>`;
 }
 const box = $('wk-ex');
 const exOf = el => S.active.exercises.find(e => e.id === el.closest('.ex-card')?.dataset.id);
@@ -679,7 +682,7 @@ box.addEventListener('change', e => {
   if (t.matches('.ex-name')) {
    ex.name = t.value; const card = t.closest('.ex-card'), h = !S.active.isRoutine && prevOf(ex);
    card.querySelector('.last').innerHTML = lastTxt(h);
-   card.querySelectorAll('.set-row').forEach((row, i) => { const p = h && h.sets[i]; row.querySelector('.kg').placeholder = p ? p.kg : '-'; row.querySelector('.reps').placeholder = p ? p.reps : '-'; });
+   card.querySelectorAll('.set-row').forEach((row, i) => { const p = h && h.sets[i]; row.querySelector('.kg').placeholder = p ? p.kg : '-'; row.querySelector('.reps').placeholder = p ? p.reps : '-'; const pl = row.querySelector('.prev-line'); if (pl) pl.innerHTML = prevLine(p); });
   } else if (t.matches('.ss-sel')) {
     ex.ss = t.value; const c = SSC[ex.ss]; t.style.color = c || '#9a9aa0'; t.closest('.ex-card').style.borderLeft = c ? `4px solid ${c}` : '';
   } else if (t.matches('.chk')) {
