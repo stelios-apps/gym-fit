@@ -18,13 +18,14 @@
 <script>tailwind.config={theme:{extend:{fontFamily:{sans:['Inter','sans-serif']},colors:{brand:{DEFAULT:'#c62828',light:'#ef5350'}}}}}</script>
 <style>
 :root{--sb:env(safe-area-inset-bottom,0px);--st:env(safe-area-inset-top,0px)}
-html,body{height:100%}
+html{background:#000}
+body{position:fixed;inset:0}
 body{background:#000;color:#f5f5f7;font-family:Inter,sans-serif;font-size:15px;padding-top:var(--st);-webkit-tap-highlight-color:transparent;overscroll-behavior:none;user-select:none;overflow:hidden}
 input,select,button{touch-action:manipulation;font-family:inherit}
 input,textarea{user-select:text}
 .hide-scroll{scrollbar-width:none}.hide-scroll::-webkit-scrollbar{display:none}
 .card{background:#141416;border:1px solid #26262a;border-radius:22px}
-.inp{width:100%;background:#1c1c1f;border:1px solid #2c2c30;border-radius:14px;padding:12px;color:#fff;outline:none;min-width:0}
+.inp{width:100%;background:#1c1c1f;border:1px solid #2c2c30;border-radius:14px;padding:12px;color:#fff;outline:none;min-width:0;font-size:16px;}
 .inp:focus{border-color:#c62828}
 .btn{padding:14px;border-radius:14px;font-weight:700;background:#1c1c1f;border:1px solid #2c2c30;width:100%;color:#fff}
 .btn:active{transform:scale(.97)}
@@ -249,7 +250,13 @@ input,textarea{user-select:text}
 <div id="dlg" class="sheet hidden fixed inset-0 z-[110] bg-black/85 flex items-end"><div class="panel card !rounded-b-none w-full p-5 pb-safe">
   <h3 class="text-lg font-bold mb-1" id="dlg-t"></h3><p class="text-sm text-gray-400 mb-4" id="dlg-m"></p><div id="dlg-b" class="space-y-2"></div>
 </div></div>
-
+<div id="rest-full" class="hidden fixed inset-0 z-[115] flex flex-col items-center justify-center text-white" style="background:linear-gradient(#d32f2f,#6d0f0f);opacity:0;transform:translate(38%,42%) scale(.1);transform-origin:bottom right;transition:opacity .35s,transform .4s">
+  <p class="font-bold tracking-widest text-sm text-white/80">ΔΙΑΛΕΙΜΜΑ</p>
+  <div id="rf-t" class="font-extrabold leading-none my-8" style="font-size:96px;font-variant-numeric:tabular-nums">00:00</div>
+  <div class="flex gap-3"><button id="rf-m" class="btn !w-auto !px-6" style="background:#0005">−15″</button><button id="rf-p" class="btn !w-auto !px-6" style="background:#0005">+15″</button></div>
+  <button id="rf-min" class="mt-10 text-white/80 text-sm">Μείωση</button>
+  <button id="rf-skip" class="mt-4 text-white font-bold underline">Παράλειψη</button>
+</div>
 <div id="toast" class="fixed left-1/2 -translate-x-1/2 z-[120] card px-5 py-3 text-sm font-medium opacity-0 pointer-events-none transition-all" style="top:calc(20px + var(--st));transform:translate(-50%,-20px)"></div>
 <datalist id="ex-list"></datalist>
 
@@ -353,6 +360,7 @@ async function boot(u) {
     S.workouts = (await rd('workouts')).sort((a, b) => b.date - a.date);
     S.routines = (await rd('routines')).sort((a, b) => (a.order || 0) - (b.order || 0));
     S.cal = await rd('calendar');
+    S.renew = await rd('renewals');
   } catch (err) { console.error(err); toast('Σφάλμα φόρτωσης δεδομένων'); }
   $('auth').classList.add('hidden'); $('app').classList.remove('hidden'); $('fab').classList.remove('hidden'); $('nav').classList.remove('hidden');
   refresh(); lockIfNeeded();
@@ -385,6 +393,7 @@ function showLock(mode) {
   $('lock-btn').classList.toggle('hidden', !un || !hasBio);
   $('lock-out').classList.toggle('hidden', !un); $('lk-cancel').classList.toggle('hidden', un);
   dots(); $('lock').classList.remove('hidden');
+  if (un && hasBio) setTimeout(bioUnlock, 300);
 }
 function lockIfNeeded() {
   if (user && !skipLock && (localStorage.getItem(bioKey()) || localStorage.getItem(pinKey()))) showLock('unlock');
@@ -449,6 +458,16 @@ function refresh() {
 function dayMap() {
   const m = {}; S.workouts.forEach(w => (m[dk(w.date)] ??= []).push({ t: 'w', w })); S.cal.forEach(c => (m[c.date] ??= []).push({ t: c.kind, c })); return m;
 }
+let calOff = 0;
+function calHTML(M, td) {
+  const now = new Date(), f = new Date(now.getFullYear(), now.getMonth() - calOff, 1), dim = new Date(f.getFullYear(), f.getMonth() + 1, 0).getDate();
+  let cells = '<div></div>'.repeat((f.getDay() + 6) % 7), cnt = 0;
+  for (let d = 1; d <= dim; d++) {
+    const key = dk(new Date(f.getFullYear(), f.getMonth(), d)), it = M[key] || [], done = it.some(i => i.t !== 'plan'), plan = it.some(i => i.t === 'plan'); if (done) cnt++;
+    cells += `<button data-day="${key}" class="day ${done ? 'done' : plan ? 'plan' : ''} ${key === td ? 'today' : ''}">${d}</button>`;
+  }
+  return `<div class="w-full"><div class="flex justify-between items-center mb-3"><button id="cal-p" class="w-9 h-9 rounded-full bg-[#1c1c1f]"><i class="ph ph-caret-left"></i></button><div class="text-center"><b class="capitalize">${f.toLocaleDateString('el-GR', { month: 'long', year: 'numeric' })}</b><div class="text-brand-light text-xs font-semibold">${cnt} προπονήσεις</div></div><button id="cal-n" class="w-9 h-9 rounded-full bg-[#1c1c1f]"><i class="ph ph-caret-right"></i></button></div><div class="grid grid-cols-7 gap-1.5">${cells}</div></div>`;
+}
 function renderDash() {
   const p = P(), sub = p.subscription, plan = p.planSize || 12;
   $('d-subs').textContent = sub;
@@ -458,18 +477,8 @@ function renderDash() {
   $('d-sub-s').textContent = sub < 0 ? `${-sub} συνεδρίες` : sub === 0 ? 'Το πακέτο έληξε' : 'Απομένουν';
   $('d-weight').textContent = p.weight || '--'; $('d-age').textContent = age(p.dob); $('d-height').textContent = p.height || '--';
   $('d-vol').textContent = (p.totalVolume || 0).toLocaleString('el-GR');
-  const M = dayMap(), now = new Date(), td = dk(now); let html = '';
-  for (let k = 0; k < 3; k++) {
-    const f = new Date(now.getFullYear(), now.getMonth() - k, 1), dim = new Date(f.getFullYear(), f.getMonth() + 1, 0).getDate();
-    let cells = '<div></div>'.repeat((f.getDay() + 6) % 7), cnt = 0;
-    for (let d = 1; d <= dim; d++) {
-      const key = dk(new Date(f.getFullYear(), f.getMonth(), d)), it = M[key] || [];
-      const done = it.some(i => i.t !== 'plan'), plan = it.some(i => i.t === 'plan'); if (done) cnt++;
-      cells += `<button data-day="${key}" class="day ${done ? 'done' : plan ? 'plan' : ''} ${key === td ? 'today' : ''}">${d}</button>`;
-    }
-    html += `<div class="shrink-0 w-full" style="scroll-snap-align:center"><div class="flex justify-between mb-3"><b class="capitalize">${f.toLocaleDateString('el-GR', { month: 'long', year: 'numeric' })}</b><span class="text-brand-light text-sm font-semibold">${cnt} προπονήσεις</span></div><div class="grid grid-cols-7 gap-1.5">${cells}</div></div>`;
-  }
-  $('cal').innerHTML = html;
+  const M = dayMap(), td = dk(new Date());
+  $('cal').innerHTML = calHTML(M, td);
   let streak = 0, c = new Date(); c.setHours(12, 0, 0, 0);
   if (!(M[dk(c)] || []).some(i => i.t !== 'plan')) c.setDate(c.getDate() - 1);
   while ((M[dk(c)] || []).some(i => i.t !== 'plan')) { streak++; c.setDate(c.getDate() - 1); }
@@ -477,6 +486,7 @@ function renderDash() {
   const up = S.cal.filter(x => x.kind === 'plan' && x.date >= td).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 3);
   $('d-up').innerHTML = up.length ? up.map(x => `<button data-day="${x.date}" class="w-full flex justify-between items-center bg-[#1c1c1f] rounded-xl px-4 py-3 text-left"><span class="font-semibold text-sm">${esc(x.name)}</span><span class="text-xs text-brand-light">${new Date(x.date + 'T12:00').toLocaleDateString('el-GR', { weekday: 'short', day: 'numeric', month: 'short' })}</span></button>`).join('') : '<p class="text-sm text-gray-500">Δεν υπάρχει προγραμματισμένη προπόνηση. Πάτα μια μέρα στο ημερολόγιο.</p>';
 }
+$('cal').addEventListener('click', e => { if (e.target.closest('#cal-p')) { calOff++; renderDash(); } else if (e.target.closest('#cal-n')) { calOff--; renderDash(); } });
 document.addEventListener('click', e => { const b = e.target.closest('[data-day]'); if (b) openDay(b.dataset.day); });
 
 function openDay(key) {
@@ -519,19 +529,25 @@ $('rt-list').addEventListener('click', async e => {
 $('rt-new').onclick = () => editRoutine(null);
 
 function renderHistory() {
-  $('hi-n').textContent = S.workouts.length; let cur = '';
-  $('hi-list').innerHTML = S.workouts.length ? S.workouts.map(w => {
-    const m = new Date(w.date).toLocaleDateString('el-GR', { month: 'long', year: 'numeric' }); let h = '';
-    if (m !== cur) { cur = m; h = `<h3 class="text-xs font-bold text-gray-500 uppercase mt-4 mb-1 pl-1">${m}</h3>`; }
-    return h + `<button data-hw="${w.id}" class="card w-full p-4 flex justify-between items-center text-left"><div><div class="flex items-center gap-2"><b>${esc(w.name)}</b><span class="text-[10px] bg-brand/10 text-brand-light px-1.5 py-0.5 rounded font-bold">#${w.sessionNumber || '-'}</span></div><span class="text-xs text-gray-500">${new Date(w.date).toLocaleDateString('el-GR', { weekday: 'short', day: 'numeric', month: 'short' })} · ${(w.exercises || []).length} ασκήσεις</span></div><div class="text-right"><b class="text-lg">${w.volume.toLocaleString('el-GR')}</b><span class="block text-[10px] text-gray-500">${Math.round(w.duration / 60000)} λεπτά</span></div></button>`;
-  }).join('') : '<p class="text-center text-gray-500 py-10">Δεν υπάρχει ιστορικό ακόμα.</p>';
+  const W = S.workouts, size = P().planSize || 12, tot = W.length; $('hi-n').textContent = tot;
+  const items = [...W.map((w, i) => ({ t: 'w', w, d: w.date, n: tot - i })), ...(S.renew || []).map(r => ({ t: 'r', r, d: r.date }))].sort((a, b) => b.d - a.d);
+  let cur = '', pk = 0, out = '';
+  items.forEach(it => {
+    const m = new Date(it.d).toLocaleDateString('el-GR', { month: 'long', year: 'numeric' });
+    if (m !== cur) { cur = m; out += `<h3 class="text-xs font-bold text-gray-500 uppercase mt-4 mb-1 pl-1">${m}</h3>`; }
+    if (it.t === 'r') { out += `<div class="rounded-2xl p-3 flex items-center gap-3 border border-dashed border-brand-light bg-brand/10"><i class="ph-fill ph-credit-card text-2xl text-brand-light"></i><div><b class="text-sm">Ανανέωση πακέτου</b><span class="block text-xs text-gray-400">${new Date(it.d).toLocaleDateString('el-GR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} · +${it.r.n} συνεδρίες</span></div></div>`; return; }
+    const w = it.w, k = Math.floor((it.n - 1) / size) + 1, no = (it.n - 1) % size + 1;
+    if (k !== pk) { pk = k; out += `<div class="text-[11px] font-bold text-brand-light mt-3 pl-1">ΠΑΚΕΤΟ ${k}</div>`; }
+    out += `<button data-hw="${w.id}" class="card w-full p-4 flex justify-between items-center text-left"><div><div class="flex items-center gap-2"><b>${esc(w.name)}</b><span class="text-[10px] bg-brand/10 text-brand-light px-1.5 py-0.5 rounded font-bold">#${no}/${size}</span>${no === 1 ? '<span class="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-bold">ΑΡΧΗ ΠΑΚΕΤΟΥ</span>' : ''}</div><span class="text-xs text-gray-500">${new Date(w.date).toLocaleDateString('el-GR', { weekday: 'short', day: 'numeric', month: 'short' })} · ${(w.exercises || []).length} ασκήσεις</span></div><div class="text-right"><b class="text-lg">${w.volume.toLocaleString('el-GR')}</b><span class="block text-[10px] text-gray-500">${Math.round(w.duration / 60000)} λεπτά</span></div></button>`;
+  });
+  $('hi-list').innerHTML = tot ? out : '<p class="text-center text-gray-500 py-10">Δεν υπάρχει ιστορικό ακόμα.</p>';
 }
 $('hi-list').addEventListener('click', e => { const b = e.target.closest('[data-hw]'); if (b) openDetail(S.workouts.find(w => w.id === b.dataset.hw)); });
 
 function openDetail(w) {
   if (!w) return;
   $('de-t').textContent = w.name; $('de-d').textContent = new Date(w.date).toLocaleDateString('el-GR', { weekday: 'long', day: 'numeric', month: 'long' });
-  $('de-v').textContent = w.volume.toLocaleString('el-GR') + ' kg'; $('de-m').textContent = Math.round(w.duration / 60000) + ' λ'; $('de-n').textContent = '#' + (w.sessionNumber || '-');
+  $('de-v').textContent = w.volume.toLocaleString('el-GR') + ' kg'; $('de-m').textContent = Math.round(w.duration / 60000) + ' λ'; { const n = S.workouts.length - S.workouts.indexOf(w), z = P().planSize || 12; $('de-n').textContent = '#' + ((n - 1) % z + 1) + '/' + z; };
   $('de-ex').innerHTML = (w.exercises || []).map(ex => `<div class="bg-[#1c1c1f] rounded-2xl p-4"><div class="flex items-center gap-2 mb-2"><b class="text-sm">${esc(ex.name)}</b>${ex.ss ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded" style="background:${SSC[ex.ss]}33;color:${SSC[ex.ss]}">Σούπερ σετ ${ex.ss}</span>` : ''}</div>${ex.sets.map((s, i) => `<div class="flex justify-between text-sm py-1 border-b border-[#26262a] last:border-0"><span class="text-gray-500 text-xs">Σετ ${i + 1}</span><b>${s.kg} kg × ${s.reps}</b></div>`).join('')}</div>`).join('') || '<p class="text-gray-500 text-sm">Καταγράφηκε χωρίς ασκήσεις.</p>';
   $('de-del').onclick = async () => {
     const r = await ask('Διαγραφή προπόνησης', 'Να επιστραφεί και η συνεδρία στο πακέτο;', [['Διαγραφή & επιστροφή συνεδρίας', 'r', 'pri'], ['Διαγραφή μόνο', 'd'], ['Άκυρο', 'n']]);
@@ -561,7 +577,7 @@ async function renew() {
   const p = P(), n = p.planSize || 12, cur = p.subscription, nw = cur + n;
   const r = await ask('Ανανέωση πακέτου', `${cur < 0 ? `Χρωστάς ${-cur} συνεδρίες, θα αφαιρεθούν από το νέο πακέτο.<br>` : ''}Προστίθενται ${n} συνεδρίες.<br><b class="text-white">Νέο υπόλοιπο: ${nw}</b>`, [['Ανανέωση', 'y', 'pri'], ['Άκυρο', 'n']]);
   if (r !== 'y') return false;
-  try { p.subscription = nw; await saveProfile(); refresh(); toast('Το πακέτο ανανεώθηκε'); return true; } catch { p.subscription = cur; toast('Αποτυχία ανανέωσης'); return false; }
+  try { p.subscription = nw; await saveProfile(); const rid = gid(), rec = { date: Date.now(), n }; await setDoc(ref('renewals', rid), rec); (S.renew ||= []).push({ id: rid, ...rec }); refresh(); toast('Το πακέτο ανανεώθηκε'); return true; } catch { p.subscription = cur; toast('Αποτυχία ανανέωσης'); return false; }
 }
 $('d-renew').onclick = renew; $('s-renew').onclick = renew;
 $('s-csv').onclick = () => {
@@ -627,6 +643,7 @@ setInterval(() => { const a = S.active; if (!a || a.isRoutine || !a.startTime) r
 /* ---------- Editor ---------- */
 const SSC = { A: '#ef5350', B: '#42a5f5', C: '#66bb6a', D: '#ffa726' };
 const prevOf = ex => { const k = (ex.name || '').trim().toLowerCase(); return k && hist[k]; };
+const lastTxt = h => h ? `Τελευταία φορά ${fd(h.date)}: ${h.sets.map(s => `${s.kg}kg×${s.reps}`).join(' · ')} <button class="copy-prev text-brand-light font-bold">↺ Αντιγραφή</button>` : '';
 function renderEditor() {
   const a = S.active, R = a.isRoutine, box = $('wk-ex');
   if (!a.exercises.length) { box.innerHTML = '<div class="h-40 flex flex-col items-center justify-center text-gray-600"><i class="ph ph-barbell text-5xl mb-2"></i><p>Πρόσθεσε μια άσκηση για να ξεκινήσεις</p></div>' + (R ? '' : '<button class="cancel-wk w-full text-center text-sm text-red-500 py-4">Ακύρωση προπόνησης</button>'); return; }
@@ -634,11 +651,11 @@ function renderEditor() {
     const h = !R && prevOf(ex), c = SSC[ex.ss];
     return `<div class="ex-card card p-3" data-id="${ex.id}" style="${c ? `border-left:4px solid ${c}` : ''}">
       <div class="flex items-center gap-2"><div class="drag-handle p-2 -ml-1 text-gray-600 touch-none"><i class="ph ph-dots-six-vertical text-xl"></i></div>
-        <div class="flex-1 min-w-0"><input list="ex-list" class="ex-name bg-transparent text-lg font-bold w-full outline-none" placeholder="Όνομα άσκησης" value="${esc(ex.name)}"><div class="last text-[11px] text-gray-500">${h ? 'Προηγούμενη φορά: ' + fd(h.date) : ''}</div></div>
+        <div class="flex-1 min-w-0"><input list="ex-list" class="ex-name bg-transparent text-lg font-bold w-full outline-none" placeholder="Όνομα άσκησης" value="${esc(ex.name)}"><div class="last text-[11px] text-gray-500">${lastTxt(h)}</div></div>
         <button class="rm-ex w-9 h-9 rounded-full bg-red-500/10 text-red-500"><i class="ph ph-trash"></i></button></div>
       <div class="flex items-center gap-2 mt-2 mb-3"><i class="ph ph-link text-gray-500"></i>
         <select class="ss-sel bg-[#1c1c1f] border border-[#2c2c30] rounded-lg text-xs px-2 py-1.5 outline-none" style="color:${c || '#9a9aa0'}"><option value="">Χωρίς σούπερ σετ</option>${Object.keys(SSC).map(k => `<option value="${k}" ${ex.ss === k ? 'selected' : ''}>Σούπερ σετ ${k}</option>`).join('')}</select></div>
-      <div class="flex gap-2 px-1 mb-1 text-[10px] text-gray-500 font-bold text-center"><span class="w-7">ΣΕΤ</span>${R ? '' : '<span class="w-[72px]">ΠΡΟΗΓ.</span>'}<span class="flex-1">KG</span><span class="flex-1">ΕΠΑΝ.</span>${R ? '' : '<span class="w-8"></span>'}</div>
+      <div class="flex gap-2 px-1 mb-1 text-[10px] text-gray-500 font-bold text-center"><span class="w-7">ΣΕΤ</span><span class="flex-1">ΚΙΛΑ</span><span class="flex-1">ΕΠΑΝΑΛΗΨΕΙΣ</span>${R ? '' : '<span class="w-8"></span>'}</div>
       <div class="space-y-2">${ex.sets.map((s, i) => setRow(ex, s, i, R, h)).join('')}</div>
       <button class="add-set w-full mt-3 py-2.5 bg-[#1c1c1f] rounded-xl text-brand-light text-xs font-bold">+ Προσθήκη σετ</button></div>`;
   }).join('') + (R ? '' : '<button class="cancel-wk w-full text-center text-sm text-red-500 py-4">Ακύρωση προπόνησης</button>');
@@ -646,9 +663,8 @@ function renderEditor() {
 function setRow(ex, s, i, R, h) {
   const p = h && h.sets[i], d = s.done && !R;
   return `<div class="set-row flex items-center gap-2 ${d ? 'opacity-40' : ''}" data-set="${s.id}"><button class="rm-set w-7 text-center text-gray-500 font-bold text-sm">${i + 1}</button>
-    ${R ? '' : `<button class="fill-prev prev w-[72px] text-[11px] text-gray-400 bg-[#1c1c1f] rounded-lg py-2">${p ? `${p.kg}×${p.reps}` : '–'}</button>`}
-    <input type="number" inputmode="decimal" step="0.5" class="kg inp text-center font-semibold" placeholder="-" value="${s.kg}" ${d ? 'disabled' : ''}>
-    <input type="number" inputmode="numeric" class="reps inp text-center font-semibold" placeholder="-" value="${s.reps}" ${d ? 'disabled' : ''}>
+    <input type="number" inputmode="decimal" step="0.5" class="kg inp text-center font-semibold" placeholder="${p ? p.kg : '-'}" value="${s.kg}" ${d ? 'disabled' : ''}>
+    <input type="number" inputmode="numeric" class="reps inp text-center font-semibold" placeholder="${p ? p.reps : '-'}" value="${s.reps}" ${d ? 'disabled' : ''}>
     ${R ? '' : `<input type="checkbox" class="set-checkbox chk" ${d ? 'checked' : ''} ${(!s.kg || !s.reps) && !d ? 'disabled' : ''}>`}</div>`;
 }
 const box = $('wk-ex');
@@ -661,9 +677,9 @@ box.addEventListener('input', e => {
 box.addEventListener('change', e => {
   const t = e.target, ex = t.closest('.ex-card') && exOf(t); if (!ex) return;
   if (t.matches('.ex-name')) {
-    ex.name = t.value; const card = t.closest('.ex-card'), h = !S.active.isRoutine && prevOf(ex);
-    card.querySelector('.last').textContent = h ? 'Προηγούμενη φορά: ' + fd(h.date) : '';
-    card.querySelectorAll('.prev').forEach((b, i) => { const p = h && h.sets[i]; b.textContent = p ? `${p.kg}×${p.reps}` : '–'; });
+   ex.name = t.value; const card = t.closest('.ex-card'), h = !S.active.isRoutine && prevOf(ex);
+   card.querySelector('.last').innerHTML = lastTxt(h);
+   card.querySelectorAll('.set-row').forEach((row, i) => { const p = h && h.sets[i]; row.querySelector('.kg').placeholder = p ? p.kg : '-'; row.querySelector('.reps').placeholder = p ? p.reps : '-'; });
   } else if (t.matches('.ss-sel')) {
     ex.ss = t.value; const c = SSC[ex.ss]; t.style.color = c || '#9a9aa0'; t.closest('.ex-card').style.borderLeft = c ? `4px solid ${c}` : '';
   } else if (t.matches('.chk')) {
@@ -679,6 +695,7 @@ box.addEventListener('click', async e => {
   if (b.classList.contains('rm-ex')) { a.exercises = a.exercises.filter(x => x !== ex); renderEditor(); }
   else if (b.classList.contains('add-set')) { const l = ex.sets[ex.sets.length - 1]; ex.sets.push({ id: gid(), kg: l?.kg ?? '', reps: l?.reps ?? '', done: false }); renderEditor(); }
   else if (b.classList.contains('rm-set')) { if (ex.sets.length > 1) { ex.sets = ex.sets.filter(s => s.id !== b.closest('.set-row').dataset.set); renderEditor(); } else toast('Χρειάζεται τουλάχιστον ένα σετ'); }
+  else if (b.classList.contains('copy-prev')) { const h = prevOf(ex); if (!h) return; h.sets.forEach((p, i) => { if (!ex.sets[i]) ex.sets.push({ id: gid(), kg: '', reps: '', done: false }); if (!ex.sets[i].done) { ex.sets[i].kg = p.kg; ex.sets[i].reps = p.reps; } }); renderEditor(); }
   else if (b.classList.contains('fill-prev')) {
     const s = setOf(b, ex), h = prevOf(ex), p = h && h.sets[ex.sets.indexOf(s)]; if (!p || s.done) return;
     s.kg = p.kg; s.reps = p.reps; const row = b.closest('.set-row'); row.querySelector('.kg').value = s.kg; row.querySelector('.reps').value = s.reps; row.querySelector('.chk').disabled = false;
@@ -692,14 +709,24 @@ if (window.Sortable) new Sortable(box, { animation: 150, handle: '.drag-handle',
 } });
 
 /* Rest timer (manual only) */
-let restInt, restEnd = 0;
-const showRest = on => { const r = $('rest'); r.style.opacity = on ? 1 : 0; r.style.pointerEvents = on ? 'auto' : 'none'; r.style.transform = on ? 'none' : 'translateY(20px)'; $('rest-open').style.display = on ? 'none' : 'flex'; };
-$('rest-open').onclick = () => showRest(true); $('rest-x').onclick = () => showRest(false);
-document.querySelectorAll('.rs').forEach(b => b.onclick = () => {
-  clearInterval(restInt); restEnd = Date.now() + b.dataset.s * 1000;
-  const tick = () => { const r = Math.max(0, Math.ceil((restEnd - Date.now()) / 1000)); $('rest-t').textContent = `${pad(Math.floor(r / 60))}:${pad(r % 60)}`; if (r <= 0) { clearInterval(restInt); navigator.vibrate?.([200, 100, 200]); } };
-  tick(); restInt = setInterval(tick, 500);
-});
+let restInt, restEnd = 0, AC; const RF = $('rest-full'), RO = $('rest-open');
+const fmt = r => `${pad(Math.floor(r / 60))}:${pad(r % 60)}`;
+const showRest = on => { const r = $('rest'); r.style.opacity = on ? 1 : 0; r.style.pointerEvents = on ? 'auto' : 'none'; r.style.transform = on ? 'none' : 'translateY(20px)'; RO.style.display = on ? 'none' : 'flex'; };
+const fullRest = on => {
+  if (on) { RF.classList.remove('hidden'); requestAnimationFrame(() => requestAnimationFrame(() => { RF.style.opacity = 1; RF.style.transform = 'none'; })); }
+  else { RF.style.opacity = 0; RF.style.transform = 'translate(38%,42%) scale(.1)'; setTimeout(() => { if (RF.style.opacity == 0) RF.classList.add('hidden'); }, 400); }
+};
+function beep() { try { const o = AC.createOscillator(), g = AC.createGain(); o.connect(g); g.connect(AC.destination); o.frequency.value = 880; g.gain.value = .35; o.start(); o.stop(AC.currentTime + .6); } catch { } }
+function stopRest(done) {
+  clearInterval(restInt); restEnd = 0; fullRest(false); RO.innerHTML = '<i class="ph ph-timer text-xl"></i>';
+  if (done) { beep(); navigator.vibrate?.([300, 120, 300, 120, 300]); RO.classList.add('animate-pulse'); setTimeout(() => RO.classList.remove('animate-pulse'), 5000); }
+}
+function tick() { const r = Math.max(0, Math.ceil((restEnd - Date.now()) / 1000)); $('rf-t').textContent = fmt(r); RO.innerHTML = `<span class="text-xs font-bold">${fmt(r)}</span>`; if (r <= 0) stopRest(true); }
+function startRest(s) { AC ||= new (window.AudioContext || window.webkitAudioContext)(); AC.resume?.(); clearInterval(restInt); restEnd = Date.now() + s * 1000; showRest(false); fullRest(true); tick(); restInt = setInterval(tick, 250); }
+RO.onclick = () => restEnd ? fullRest(true) : showRest(true); $('rest-x').onclick = () => showRest(false);
+document.querySelectorAll('.rs').forEach(b => b.onclick = () => startRest(+b.dataset.s));
+$('rf-p').onclick = () => { restEnd += 15000; tick(); }; $('rf-m').onclick = () => { restEnd -= 15000; tick(); };
+$('rf-skip').onclick = () => stopRest(false); $('rf-min').onclick = () => fullRest(false);
 
 /* ---------- Save ---------- */
 $('wk-finish').onclick = async () => {
