@@ -560,14 +560,20 @@ function renderHistory() {
   items.forEach(it => {
     const m = new Date(it.d).toLocaleDateString('el-GR', { month: 'long', year: 'numeric' });
     if (m !== cur) { cur = m; out += `<h3 class="text-xs font-bold text-gray-500 uppercase mt-4 mb-1 pl-1">${m}</h3>`; }
-    if (it.t === 'r') { out += `<div class="rounded-2xl p-3 flex items-center gap-3 border border-dashed border-brand-light bg-brand/10"><i class="ph-fill ph-credit-card text-2xl text-brand-light"></i><div><b class="text-sm">Ανανέωση πακέτου</b><span class="block text-xs text-gray-400">${new Date(it.d).toLocaleDateString('el-GR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} · +${it.r.n} συνεδρίες</span></div></div>`; return; }
+    if (it.t === 'r') { out += `<button data-rn="${it.r.id}" class="w-full text-left rounded-2xl p-3 flex items-center gap-3 border border-dashed border-brand-light bg-brand/10"><i class="ph-fill ph-credit-card text-2xl text-brand-light"></i><div><b class="text-sm">Ανανέωση πακέτου</b><span class="block text-xs text-gray-400">${new Date(it.d).toLocaleDateString('el-GR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} · +${it.r.n} συνεδρίες</span></div></button>`; return; }
     const w = it.w, { k, no } = PK[w.id];
     if (k !== pk) { pk = k; out += `<div class="text-[11px] font-bold text-brand-light mt-3 pl-1">ΠΑΚΕΤΟ ${k}</div>`; }
     out += `<button data-hw="${w.id}" class="card w-full p-4 flex justify-between items-center text-left"><div><div class="flex items-center gap-2"><b>${esc(w.name)}</b><span class="text-[10px] bg-brand/10 text-brand-light px-1.5 py-0.5 rounded font-bold">#${no}/${size}</span>${no === 1 ? '<span class="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-bold">ΑΡΧΗ ΠΑΚΕΤΟΥ</span>' : ''}</div><span class="text-xs text-gray-500">${new Date(w.date).toLocaleDateString('el-GR', { weekday: 'short', day: 'numeric', month: 'short' })} ${w.time ? ' · ' + w.time : ''}· ${(w.exercises || []).length} ασκήσεις</span></div><div class="text-right"><b class="text-lg">${w.volume.toLocaleString('el-GR')}</b><span class="block text-[10px] text-gray-500">${w.duration ? Math.round(w.duration / 60000) + ' λεπτά' : 'καταχώρηση'}</span></div></button>`;
   });
   $('hi-list').innerHTML = tot ? out : '<p class="text-center text-gray-500 py-10">Δεν υπάρχει ιστορικό ακόμα.</p>';
 }
-$('hi-list').addEventListener('click', e => { const b = e.target.closest('[data-hw]'); if (b) openDetail(S.workouts.find(w => w.id === b.dataset.hw)); });
+$('hi-list').addEventListener('click', e => { const b = e.target.closest('[data-hw]');
+$('hi-list').addEventListener('click', async e => {
+  const b = e.target.closest('[data-rn]'); if (!b) return;
+  const r = await ask('Ανανέωση πακέτου', 'Να διαγραφεί αυτή η εγγραφή από το ιστορικό; (Δεν αλλάζει τις συνεδρίες σου.)', [['Διαγραφή εγγραφής', 'y', 'dng'], ['Άκυρο', 'n']]);
+  if (r !== 'y') return;
+  try { await deleteDoc(ref('renewals', b.dataset.rn)); S.renew = S.renew.filter(x => x.id !== b.dataset.rn); refresh(); toast('Διαγράφηκε'); } catch { toast('Αποτυχία διαγραφής'); }
+}); if (b) openDetail(S.workouts.find(w => w.id === b.dataset.hw)); });
 
 function openDetail(w) {
   if (!w) return;
