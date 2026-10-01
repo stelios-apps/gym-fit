@@ -48,7 +48,7 @@ input,textarea{user-select:text}
 .sortable-ghost{opacity:.4}
 .nav-btn{color:#6b6b70;font-size:10px;font-weight:600}.nav-btn.on{color:#ef5350}
 .inp{font-size:16px}
-input[type=date]{-webkit-appearance:none;appearance:none;display:block;min-width:0;max-width:100%;width:100%;height:46px;text-align:left}
+input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;display:block;min-width:0;max-width:100%;width:100%;height:46px;text-align:left}
 #s-bio,#s-csv{display:none}
 </style>
 </head>
@@ -245,7 +245,7 @@ input[type=date]{-webkit-appearance:none;appearance:none;display:block;min-width
   <div class="flex justify-between items-center mb-3"><h2 class="text-lg font-bold capitalize" id="day-t"></h2><button data-close="sheet-day" class="w-8 h-8 rounded-full bg-[#1c1c1f] text-gray-400"><i class="ph ph-x"></i></button></div>
   <div id="day-list" class="space-y-2 mb-4"></div>
   <input id="day-name" class="inp mb-3" placeholder="Όνομα (προαιρετικό)">
-<div class="grid grid-cols-2 gap-3 mb-3"><div><label class="lbl">Ρουτίνα (προαιρετικά)</label><select id="day-routine" class="inp"></select></div><div><label class="lbl">Ώρα (προαιρετικά)</label><input id="day-time" type="time" class="inp"></div></div>
+<div class="grid gap-3 mb-3" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><div><label class="lbl">Ρουτίνα(προαιρετικά)</label><select id="day-routine" class="inp"></select></div><div><label class="lbl">Ώρα (προαιρετικά)</label><input id="day-time" type="time" class="inp"></div></div>
 <label class="flex items-center gap-2 text-sm text-gray-300 mb-3"><input id="day-first" type="checkbox" class="set-checkbox" style="width:24px;height:24px"> Αυτή είναι η 1η προπόνηση νέου πακέτου</label>
   <div class="grid grid-cols-2 gap-3"><button id="day-done" class="btn pri !text-sm">Έκανα προπόνηση</button><button id="day-plan" class="btn !text-sm">Προγραμμάτισε</button></div>
 </div></div>
