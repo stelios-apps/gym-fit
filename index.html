@@ -161,7 +161,6 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;displa
 
     <section id="v-settings" class="view hidden space-y-4">
       <h2 class="text-2xl font-bold">Προφίλ</h2>
-      <p id="dbg" class="text-[10px] text-gray-600"></p>
       <div class="card p-5 space-y-4">
         <div><label class="lbl">Ονοματεπώνυμο</label><input id="s-name" class="inp"></div>
         <div class="grid grid-cols-2 gap-3">
@@ -790,7 +789,6 @@ async function saveWorkout() {
 }
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
 setMode('login'); go('dash');
-$('dbg').textContent = 'inner ' + innerWidth + 'x' + innerHeight + ' · screen ' + screen.width + 'x' + screen.height + ' · standalone ' + navigator.standalone;
 </script>
 </body>
 </html>
