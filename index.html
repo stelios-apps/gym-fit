@@ -2,6 +2,11 @@
 <html lang="el" class="dark">
 <head>
 <meta charset="UTF-8">
+<script>
+window.addEventListener('error', function (e) { show(e.message + ' (γραμμή ' + e.lineno + ')'); });
+window.addEventListener('unhandledrejection', function (e) { show('Promise: ' + ((e.reason && (e.reason.code || e.reason.message)) || e.reason)); });
+function show(t) { var d = document.getElementById('errbox') || (document.body || document.documentElement).appendChild(Object.assign(document.createElement('div'), { id: 'errbox' })); d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#b00020;color:#fff;font:12px monospace;padding:10px;white-space:pre-wrap'; d.textContent += t + '\n'; }
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Fit</title>
 <meta name="theme-color" content="#000000">
@@ -35,6 +40,765 @@ input,textarea{user-select:text}
 .sheet{opacity:0;pointer-events:none;transition:opacity .25s}
 .sheet.show{opacity:1;pointer-events:auto}
 .sheet>.panel{transform:translateY(100%);transition:transform .28s cubic-bezier(.16,1,.3,1)}
+.sheet.show>.panel{transform:none}
+.pb-safe{padding-bottom:calc(20px + var(--sb))}
+.set-checkbox{appearance:none;width:32px;height:32px;border-radius:9px;background:#1c1c1f;border:2px solid #3a3a3c;display:grid;place-content:center;flex-shrink:0}
+.set-checkbox::before{content:"";width:14px;height:14px;clip-path:polygon(14% 44%,0 65%,50% 100%,100% 16%,80% 0,43% 62%);background:#fff;transform:scale(0);transition:.12s}
+.set-checkbox:checked{background:#c62828;border-color:transparent}.set-checkbox:checked::before{transform:scale(1)}
+.set-checkbox:disabled:not(:checked){opacity:.35}
+.day{height:34px;border-radius:10px;background:#1c1c1f;font-size:12px;color:#8e8e93}
+.day.done{background:#c62828;color:#fff;font-weight:700}
+.day.plan{border:1.5px dashed #ef5350;color:#ef5350}
+.day.today{box-shadow:inset 0 0 0 1.5px #fff}
+.sortable-ghost{opacity:.4}
+.nav-btn{color:#6b6b70;font-size:10px;font-weight:600}.nav-btn.on{color:#ef5350}
+.inp{font-size:16px}
+input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;display:block;min-width:0;max-width:100%;width:100%;height:46px;text-align:left}
+#s-bio,#s-csv{display:none}
+</style>
+</head>
+<body class="flex flex-col">
+
+<!-- AUTH -->
+<div id="auth" class="fixed inset-0 z-[100] bg-black overflow-y-auto px-6" style="padding-top:calc(40px + var(--st))">
+  <div class="max-w-md mx-auto space-y-6 pb-10">
+    <div class="text-center">
+      <div class="w-16 h-16 bg-brand rounded-2xl mx-auto flex items-center justify-center mb-4"><i class="ph-fill ph-barbell text-3xl"></i></div>
+      <h1 class="text-3xl font-extrabold tracking-tight">Fit</h1>
+      <p class="text-gray-400 text-sm mt-1">Το προπονητικό σου ημερολόγιο</p>
+    </div>
+    <div class="card p-5 space-y-4">
+      <div class="grid grid-cols-2 bg-black rounded-2xl p-1">
+        <button id="tab-login" class="py-2.5 rounded-xl text-sm font-semibold bg-[#1e1e20]">Σύνδεση</button>
+        <button id="tab-reg" class="py-2.5 rounded-xl text-sm font-semibold text-gray-500">Εγγραφή</button>
+      </div>
+      <form id="auth-form" class="space-y-3">
+        <div id="reg-fields" class="hidden space-y-3">
+          <div><label class="lbl">Ονοματεπώνυμο</label><input id="a-name" class="inp" placeholder="Γιάννης Παπαδόπουλος"></div>
+          <div class="grid grid-cols-2 gap-3">
+            <div><label class="lbl">Ημ. γέννησης</label><input type="date" id="a-dob" class="inp"></div>
+            <div><label class="lbl">Ύψος (cm)</label><input type="number" id="a-h" class="inp" placeholder="180"></div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div><label class="lbl">Βάρος (kg)</label><input type="number" step="0.1" id="a-w" class="inp" placeholder="75"></div>
+            <div><label class="lbl">Συνεδρίες πακέτου</label><input type="number" id="a-subs" class="inp" value="12"></div>
+          </div>
+        </div>
+        <div><label class="lbl">Email</label><input type="email" id="a-email" required class="inp" autocomplete="email"></div>
+        <div><label class="lbl">Κωδικός</label><input type="password" id="a-pass" required class="inp" autocomplete="current-password"></div>
+        <button type="submit" id="a-btn" class="btn pri mt-2">Σύνδεση</button>
+        <p id="a-err" class="text-brand-light text-center text-sm hidden"></p>
+        <button type="button" id="a-forgot" class="w-full text-xs text-gray-500 pt-1">Ξέχασα τον κωδικό</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- LOCK -->
+<div id="lock" class="hidden fixed inset-0 z-[105] bg-black flex flex-col items-center justify-center gap-4 px-8">
+  <div class="w-16 h-16 rounded-3xl bg-brand flex items-center justify-center"><i class="ph-fill ph-lock-key text-3xl"></i></div>
+  <p id="lk-msg" class="text-gray-400 text-sm"></p>
+  <div id="lk-dots" class="flex gap-3 h-4"></div>
+  <div id="lk-pad" class="grid grid-cols-3 gap-3 w-64"></div>
+  <button id="lock-btn" class="btn !w-64 flex items-center justify-center gap-2"><i class="ph ph-fingerprint text-xl"></i>Face ID / Touch ID</button>
+  <button id="lock-out" class="text-xs text-gray-500">Ξέχασα το PIN · είσοδος με κωδικό</button>
+  <button id="lk-cancel" class="hidden text-xs text-gray-500">Άκυρο</button>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden flex-1 flex flex-col min-h-0">
+  <header class="px-5 pt-4 pb-2 flex justify-between items-center">
+    <div><h1 class="text-2xl font-extrabold tracking-tight" id="h-hello">Γεια σου</h1><p class="text-sm text-gray-500" id="h-date"></p></div>
+    <div class="w-11 h-11 rounded-full bg-[#1c1c1f] border border-[#2c2c30] flex items-center justify-center font-bold text-brand-light" id="h-av">A</div>
+  </header>
+  <main class="flex-1 overflow-y-auto hide-scroll px-5 pt-3" style="padding-bottom:calc(120px + var(--sb))">
+
+    <section id="v-dash" class="view space-y-4">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="card p-4 flex flex-col justify-between" style="min-height:150px">
+          <div class="flex items-start justify-between">
+            <div class="relative w-14 h-14 flex items-center justify-center">
+              <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36"><path d="M18 2.08a15.92 15.92 0 0 1 0 31.83a15.92 15.92 0 0 1 0-31.83" fill="none" stroke="#2c2c30" stroke-width="3"/><path id="d-ring" d="M18 2.08a15.92 15.92 0 0 1 0 31.83a15.92 15.92 0 0 1 0-31.83" fill="none" stroke="#c62828" stroke-width="3" stroke-linecap="round" stroke-dasharray="0,100" style="transition:.8s"/></svg>
+              <span class="absolute text-lg font-extrabold" id="d-subs">0</span>
+            </div>
+          </div>
+          <div><p class="font-semibold" id="d-sub-t">Συνεδρίες</p><p class="text-xs text-gray-500" id="d-sub-s">Απομένουν</p></div>
+          <button id="d-renew" class="text-xs font-bold text-brand-light text-left mt-1">Ανανέωση πακέτου</button>
+        </div>
+        <div class="card p-4 flex flex-col justify-between" style="min-height:150px">
+          <i class="ph ph-scales text-xl text-brand-light"></i>
+          <div class="flex items-baseline gap-1"><span class="text-4xl font-extrabold tracking-tighter" id="d-weight">--</span><span class="text-gray-500 text-sm">kg</span></div>
+          <div><p class="font-semibold">Σωματικό βάρος</p><p class="text-xs text-gray-500"><span id="d-age">--</span> ετών · <span id="d-height">--</span> cm</p></div>
+        </div>
+      </div>
+      <div class="card p-5 flex items-center justify-between">
+        <div><p class="font-semibold">Συνολικός όγκος</p><p class="text-xs text-gray-500">Όλες οι προπονήσεις</p></div>
+        <div class="flex items-baseline gap-1"><span class="text-3xl font-extrabold tracking-tighter" id="d-vol">0</span><span class="text-gray-500">kg</span></div>
+      </div>
+      <div class="card p-5">
+        <div class="flex justify-between items-center mb-3">
+          <h3 class="font-semibold">Δραστηριότητα</h3>
+          <span class="text-xs font-semibold text-brand-light bg-brand/10 px-2 py-1 rounded-md" id="d-streak">0 ημέρες στη σειρά</span>
+        </div>
+        <div class="grid grid-cols-7 gap-1.5 mb-1.5 text-center text-[10px] text-gray-600"><span>Δε</span><span>Τρ</span><span>Τε</span><span>Πε</span><span>Πα</span><span>Σα</span><span>Κυ</span></div>
+        <div id="cal" class="flex overflow-x-auto hide-scroll gap-6" style="scroll-snap-type:x mandatory"></div>
+        <p class="text-[11px] text-gray-500 mt-3">Σύρε για προηγούμενους μήνες · πάτα μια μέρα για να καταγράψεις ή να προγραμματίσεις προπόνηση.</p>
+        <div class="flex gap-4 text-[11px] text-gray-500 mt-2"><span><b class="inline-block w-2.5 h-2.5 rounded-sm bg-brand align-middle"></b> Έγινε</span><span><b class="inline-block w-2.5 h-2.5 rounded-sm border border-dashed border-brand-light align-middle"></b> Προγραμματισμένη</span></div>
+      </div>
+      <div class="card p-5">
+        <h3 class="font-semibold mb-3">Επόμενες προπονήσεις</h3>
+        <div id="d-up" class="space-y-2"></div>
+      </div>
+    </section>
+
+    <section id="v-routines" class="view hidden space-y-4">
+      <div class="flex justify-between items-center">
+        <div><h2 class="text-2xl font-bold">Ρουτίνες</h2><p class="text-sm text-gray-500">Έτοιμα προγράμματα για γρήγορη έναρξη</p></div>
+        <button id="rt-new" class="w-10 h-10 rounded-full bg-[#1c1c1f] border border-[#2c2c30] text-brand-light flex items-center justify-center"><i class="ph ph-plus text-xl"></i></button>
+      </div>
+      <div id="rt-list" class="space-y-3"></div>
+    </section>
+
+    <section id="v-history" class="view hidden space-y-3">
+      <div class="flex justify-between items-center"><h2 class="text-2xl font-bold">Ιστορικό</h2><span class="text-sm text-gray-400"><span id="hi-n">0</span> προπονήσεις</span></div>
+      <div id="hi-list" class="space-y-3"></div>
+    </section>
+
+    <section id="v-settings" class="view hidden space-y-4">
+      <h2 class="text-2xl font-bold">Προφίλ</h2>
+      <p id="dbg" class="text-[10px] text-gray-600"></p>
+      <div class="card p-5 space-y-4">
+        <div><label class="lbl">Ονοματεπώνυμο</label><input id="s-name" class="inp"></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="lbl">Βάρος (kg)</label><input id="s-w" type="number" step="0.1" class="inp"></div>
+          <div><label class="lbl">Ύψος (cm)</label><input id="s-h" type="number" class="inp"></div>
+        </div>
+        <div><label class="lbl">Ημερομηνία γέννησης</label><input id="s-dob" type="date" class="inp"></div>
+      </div>
+      <div class="card p-5 space-y-4">
+        <div class="flex justify-between items-center"><h3 class="font-semibold">Συνδρομή</h3><span class="font-bold text-brand-light" id="s-cur">0</span></div>
+        <div><label class="lbl">Υπόλοιπο συνεδριών (αρνητικό = χρωστάς)</label>
+          <div class="flex gap-2"><button class="btn !w-12 !p-0" id="s-minus">−</button><input id="s-subs" type="number" class="inp text-center font-bold text-lg"><button class="btn !w-12 !p-0" id="s-plus">+</button></div></div>
+        <div><label class="lbl">Συνεδρίες ανά πακέτο</label><input id="s-plan" type="number" class="inp"></div>
+        <button id="s-renew" class="btn">Ανανέωση πακέτου</button>
+      </div>
+      <button id="s-save" class="btn pri">Αποθήκευση</button>
+      <div class="card p-5 space-y-3">
+        <h3 class="font-semibold">Ασφάλεια & δεδομένα</h3>
+        <button id="s-pin" class="btn flex items-center justify-center gap-2"><i class="ph ph-password text-xl"></i><span id="s-pin-t">Ορισμός PIN</span></button>
+        <button id="s-bio" class="btn flex items-center justify-center gap-2"><i class="ph ph-fingerprint text-xl"></i><span id="s-bio-t">Face ID / Touch ID</span></button>
+        <button id="s-csv" class="btn flex items-center justify-center gap-2"><i class="ph ph-file-csv text-xl"></i>Εξαγωγή σε Excel (CSV)</button>
+        <button id="s-out" class="btn dng">Αποσύνδεση</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- NAV + FAB -->
+<button id="fab" class="hidden fixed left-1/2 -translate-x-1/2 w-16 h-16 rounded-full bg-brand text-white flex items-center justify-center z-40 shadow-[0_8px_30px_rgba(198,40,40,.5)]" style="bottom:calc(24px + var(--sb))"><i id="fab-i" class="ph ph-plus text-3xl"></i></button>
+<nav id="nav" class="hidden fixed bottom-0 left-0 w-full z-30 bg-[#0c0c0d]/90 backdrop-blur-xl border-t border-[#26262a] flex items-center px-2 pt-2" style="padding-bottom:calc(8px + var(--sb))">
+  <button class="nav-btn on flex-1 flex flex-col items-center py-1" data-t="dash"><i class="ph-fill ph-squares-four text-2xl"></i>Αρχική</button>
+  <button class="nav-btn flex-1 flex flex-col items-center py-1" data-t="routines"><i class="ph ph-clipboard-text text-2xl"></i>Ρουτίνες</button>
+  <div class="w-16"></div>
+  <button class="nav-btn flex-1 flex flex-col items-center py-1" data-t="history"><i class="ph ph-clock-counter-clockwise text-2xl"></i>Ιστορικό</button>
+  <button class="nav-btn flex-1 flex flex-col items-center py-1" data-t="settings"><i class="ph ph-user text-2xl"></i>Προφίλ</button>
+</nav>
+
+<!-- START SHEET -->
+<div id="sheet-start" class="sheet hidden fixed inset-0 z-[60] bg-black/80 flex items-end"><div class="panel card !rounded-b-none w-full p-5 pb-safe">
+  <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold">Νέα προπόνηση</h2><button data-close="sheet-start" class="w-8 h-8 rounded-full bg-[#1c1c1f] text-gray-400"><i class="ph ph-x"></i></button></div>
+  <button id="st-empty" class="w-full border-2 border-dashed border-[#2c2c30] rounded-2xl p-4 mb-5 text-center"><i class="ph ph-plus-circle text-3xl text-brand-light block"></i><b>Κενή προπόνηση</b><span class="block text-xs text-gray-500">Φτιάξ' τη όπως πας</span></button>
+  <p class="lbl">Ή διάλεξε ρουτίνα</p>
+  <div id="st-list" class="space-y-2 overflow-y-auto hide-scroll" style="max-height:38vh"></div>
+</div></div>
+
+<!-- WORKOUT OVERLAY -->
+<div id="overlay" class="sheet hidden fixed inset-0 z-[70] bg-black"><div class="panel h-full flex flex-col relative" style="padding-top:var(--st);background:#000">
+  <header class="flex items-center gap-2 px-3 py-3 border-b border-[#26262a] bg-[#0c0c0d]">
+    <button id="wk-min" class="p-2 text-gray-400"><i class="ph ph-caret-down text-2xl"></i></button>
+    <div class="flex-1 min-w-0 text-center"><input id="wk-title" class="bg-transparent text-center font-bold text-lg w-full outline-none"><div id="wk-clock" class="text-xs text-brand-light font-semibold"><span id="wk-time">00:00</span></div></div>
+    <button id="wk-finish" class="btn pri !w-auto !py-2 !px-5 !rounded-full text-sm">Τέλος</button>
+  </header>
+  <div id="wk-ex" class="flex-1 overflow-y-auto hide-scroll p-4 space-y-4" style="padding-bottom:160px"></div>
+  <div class="absolute bottom-0 left-0 w-full p-4 bg-[#0c0c0d]/95 border-t border-[#26262a]" style="padding-bottom:calc(16px + var(--sb))">
+    <button id="wk-add" class="btn flex items-center justify-center gap-2"><i class="ph ph-plus text-brand-light"></i>Προσθήκη άσκησης</button>
+  </div>
+  <div id="rest" class="absolute right-4 card p-3 w-44 z-30 opacity-0 pointer-events-none transition" style="bottom:120px;transform:translateY(20px)">
+    <div class="flex justify-between items-center mb-1"><span class="text-xs font-bold text-brand-light">ΔΙΑΛΕΙΜΜΑ</span><button id="rest-x" class="text-gray-500"><i class="ph ph-x"></i></button></div>
+    <div class="text-3xl font-extrabold mb-2 text-center" id="rest-t">00:00</div>
+    <div class="grid grid-cols-3 gap-1">
+      <button class="rs btn !p-1.5 !text-xs" data-s="30">30s</button><button class="rs btn !p-1.5 !text-xs" data-s="60">60s</button><button class="rs btn !p-1.5 !text-xs" data-s="90">90s</button>
+      <button class="rs btn !p-1.5 !text-xs" data-s="120">2m</button><button class="rs btn !p-1.5 !text-xs" data-s="150">2.5m</button><button class="rs btn !p-1.5 !text-xs" data-s="180">3m</button>
+    </div>
+  </div>
+  <button id="rest-open" class="absolute right-4 w-12 h-12 card !rounded-full flex items-center justify-center text-brand-light z-20" style="bottom:100px"><i class="ph ph-timer text-xl"></i></button>
+</div></div>
+
+<!-- DETAIL -->
+<div id="sheet-detail" class="sheet hidden fixed inset-0 z-[80] bg-black/85 flex items-end"><div class="panel card !rounded-b-none w-full flex flex-col" style="height:85vh">
+  <div class="flex justify-between items-center p-5 border-b border-[#26262a]">
+    <div><h2 class="text-xl font-bold" id="de-t"></h2><p class="text-sm text-gray-500" id="de-d"></p></div>
+    <div class="flex gap-2"><button id="de-del" class="w-10 h-10 rounded-full bg-brand/10 text-brand-light"><i class="ph ph-trash text-lg"></i></button><button data-close="sheet-detail" class="w-10 h-10 rounded-full bg-[#1c1c1f] text-gray-400"><i class="ph ph-x text-lg"></i></button></div>
+  </div>
+  <div class="grid grid-cols-3 text-center py-3 border-b border-[#26262a] text-sm">
+    <div><p class="text-[10px] text-gray-500">ΟΓΚΟΣ</p><b id="de-v"></b></div><div class="border-x border-[#26262a]"><p class="text-[10px] text-gray-500">ΔΙΑΡΚΕΙΑ</p><b id="de-m"></b></div><div><p class="text-[10px] text-gray-500">ΣΥΝΕΔΡΙΑ</p><b class="text-brand-light" id="de-n"></b></div>
+  </div>
+  <div id="de-ex" class="flex-1 overflow-y-auto hide-scroll p-4 space-y-3 pb-10"></div>
+</div></div>
+
+<!-- DAY SHEET -->
+<div id="sheet-day" class="sheet hidden fixed inset-0 z-[65] bg-black/80 flex items-end"><div class="panel card !rounded-b-none w-full p-5 pb-safe">
+  <div class="flex justify-between items-center mb-3"><h2 class="text-lg font-bold capitalize" id="day-t"></h2><button data-close="sheet-day" class="w-8 h-8 rounded-full bg-[#1c1c1f] text-gray-400"><i class="ph ph-x"></i></button></div>
+  <div id="day-list" class="space-y-2 mb-4"></div>
+  <input id="day-name" class="inp mb-3" placeholder="Όνομα (προαιρετικό)">
+<div class="grid gap-3 mb-3" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><div><label class="lbl">Ρουτίνα (προαιρετικά)</label><select id="day-routine" class="inp"></select></div><div><label class="lbl">Ώρα (προαιρετικά)</label><input id="day-time" type="time" class="inp"></div></div>
+<label class="flex items-center gap-2 text-sm text-gray-300 mb-3"><input id="day-first" type="checkbox" class="set-checkbox" style="width:24px;height:24px"> Αυτή είναι η 1η προπόνηση νέου πακέτου</label>
+  <div class="grid grid-cols-2 gap-3"><button id="day-done" class="btn pri !text-sm">Έκανα προπόνηση</button><button id="day-plan" class="btn !text-sm">Προγραμμάτισε</button></div>
+</div></div>
+
+<!-- DIALOG -->
+<div id="dlg" class="sheet hidden fixed inset-0 z-[110] bg-black/85 flex items-end"><div class="panel card !rounded-b-none w-full p-5 pb-safe">
+  <h3 class="text-lg font-bold mb-1" id="dlg-t"></h3><p class="text-sm text-gray-400 mb-4" id="dlg-m"></p><div id="dlg-b" class="space-y-2"></div>
+</div></div>
+<div id="rest-full" class="hidden fixed inset-0 z-[115] flex flex-col items-center justify-center text-white" style="background:linear-gradient(#d32f2f,#6d0f0f);opacity:0;transform:translate(38%,42%) scale(.1);transform-origin:bottom right;transition:opacity .35s,transform .4s">
+  <p class="font-bold tracking-widest text-sm text-white/80">ΔΙΑΛΕΙΜΜΑ</p>
+  <div id="rf-t" class="font-extrabold leading-none my-8" style="font-size:96px;font-variant-numeric:tabular-nums">00:00</div>
+  <div class="flex gap-3"><button id="rf-m" class="btn !w-auto !px-6" style="background:#0005">−15″</button><button id="rf-p" class="btn !w-auto !px-6" style="background:#0005">+15″</button></div>
+  <button id="rf-min" class="mt-10 text-white/80 text-sm">Μείωση</button>
+  <button id="rf-skip" class="mt-4 text-white font-bold underline">Παράλειψη</button>
+</div>
+<div id="toast" class="fixed left-1/2 -translate-x-1/2 z-[120] card px-5 py-3 text-sm font-medium opacity-0 pointer-events-none transition-all" style="top:calc(20px + var(--st));transform:translate(-50%,-20px)"></div>
+<datalist id="ex-list"></datalist>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, getFirestore, doc, getDoc, setDoc as fsSet, collection, getDocs, deleteDoc as fsDel, writeBatch as fsBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+const app = initializeApp({
+  apiKey: "AIzaSyC2S2SVWswn_0oHhIhtxAD_wTyMB00ubqE",
+  authDomain: "fit-gym-ca051.firebaseapp.com",
+  projectId: "fit-gym-ca051",
+  storageBucket: "fit-gym-ca051.firebasestorage.app",
+  messagingSenderId: "963159378903",
+  appId: "1:963159378903:web:c6cdf3062d6503b83d1992"
+});
+const auth = getAuth(app), APP = 'fit-gym-ca051';
+let db; try { db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }); } catch { db = getFirestore(app); }
+// Offline: οι εγγραφές μπαίνουν σε ουρά αντί να κολλάει το κουμπί
+const sync = p => new Promise((ok, no) => { const t = setTimeout(ok, 4000); p.then(() => { clearTimeout(t); ok(); }, e => { clearTimeout(t); no(e); }); });
+const setDoc = (...a) => sync(fsSet(...a)), deleteDoc = (...a) => sync(fsDel(...a));
+const writeBatch = d => { const b = fsBatch(d); return { set: (...a) => b.set(...a), commit: () => sync(b.commit()) }; };
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const gid = () => Math.random().toString(36).slice(2, 12);
+const pad = n => String(n).padStart(2, '0');
+const dk = d => { const x = new Date(d); return `${x.getFullYear()}-${pad(x.getMonth()+1)}-${pad(x.getDate())}`; };
+const fd = t => new Date(t).toLocaleDateString('el-GR', { day: 'numeric', month: 'short' });
+const age = d => { if (!d) return '--'; const b = new Date(d), n = new Date(); let a = n.getFullYear() - b.getFullYear(); if (n < new Date(n.getFullYear(), b.getMonth(), b.getDate())) a--; return a; };
+
+let user = null, regBusy = false, hist = {}, dayKey = '', lastHidden = 0;
+let S = { profile: { name: 'Athlete', dob: '', height: 0, weight: 0, subscription: 12, planSize: 12, totalVolume: 0 }, workouts: [], routines: [], cal: [], active: null };
+const P = () => S.profile;
+const col = n => collection(db, 'artifacts', APP, 'users', user.uid, n);
+const ref = (n, id) => doc(db, 'artifacts', APP, 'users', user.uid, n, id);
+const profRef = () => doc(db, 'artifacts', APP, 'users', user.uid, 'profile', 'data');
+const saveProfile = () => setDoc(profRef(), P(), { merge: true });
+
+/* ---------- UI helpers ---------- */
+const timers = {};
+function openSheet(id) { clearTimeout(timers[id]); const m = $(id); m.classList.remove('hidden'); requestAnimationFrame(() => requestAnimationFrame(() => m.classList.add('show'))); }
+function closeSheet(id) { const m = $(id); m.classList.remove('show'); clearTimeout(timers[id]); timers[id] = setTimeout(() => m.classList.add('hidden'), 300); }
+document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => closeSheet(b.dataset.close));
+['sheet-start', 'sheet-day', 'sheet-detail'].forEach(id => $(id).addEventListener('click', e => { if (e.target.id === id) closeSheet(id); }));
+
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.style.opacity = 1; t.style.transform = 'translate(-50%,0)';
+  clearTimeout(timers.toast); timers.toast = setTimeout(() => { t.style.opacity = 0; t.style.transform = 'translate(-50%,-20px)'; }, 2600);
+}
+function ask(title, msg, btns) {
+  return new Promise(res => {
+    $('dlg-t').textContent = title; $('dlg-m').innerHTML = msg; const b = $('dlg-b'); b.innerHTML = '';
+    btns.forEach(([label, val, cls]) => { const e = document.createElement('button'); e.className = 'btn ' + (cls || ''); e.textContent = label; e.onclick = () => { closeSheet('dlg'); res(val); }; b.appendChild(e); });
+    openSheet('dlg');
+  });
+}
+
+/* ---------- Auth ---------- */
+let mode = 'login';
+function setMode(m) {
+  mode = m; $('reg-fields').classList.toggle('hidden', m !== 'reg');
+  $('tab-login').className = 'py-2.5 rounded-xl text-sm font-semibold ' + (m === 'login' ? 'bg-[#1e1e20]' : 'text-gray-500');
+  $('tab-reg').className = 'py-2.5 rounded-xl text-sm font-semibold ' + (m === 'reg' ? 'bg-[#1e1e20]' : 'text-gray-500');
+  $('a-btn').textContent = m === 'login' ? 'Σύνδεση' : 'Δημιουργία λογαριασμού'; $('a-err').classList.add('hidden');
+}
+$('tab-login').onclick = () => setMode('login'); $('tab-reg').onclick = () => setMode('reg');
+const errMap = { 'auth/invalid-credential': 'Λάθος email ή κωδικός.', 'auth/email-already-in-use': 'Αυτό το email χρησιμοποιείται ήδη.', 'auth/weak-password': 'Ο κωδικός θέλει τουλάχιστον 6 χαρακτήρες.', 'auth/invalid-email': 'Μη έγκυρο email.', 'auth/too-many-requests': 'Πολλές προσπάθειες. Δοκίμασε αργότερα.' };
+$('auth-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const email = $('a-email').value.trim(), pass = $('a-pass').value, btn = $('a-btn');
+  btn.disabled = true; btn.innerHTML = '<i class="ph ph-spinner animate-spin"></i>'; $('a-err').classList.add('hidden'); skipLock = true;
+  try {
+    if (mode === 'login') await signInWithEmailAndPassword(auth, email, pass);
+    else {
+      regBusy = true;
+      const c = await createUserWithEmailAndPassword(auth, email, pass);
+      const n = parseInt($('a-subs').value) || 12;
+      const prof = { name: $('a-name').value.trim() || 'Athlete', dob: $('a-dob').value, height: parseInt($('a-h').value) || 0, weight: parseFloat($('a-w').value) || 0, subscription: n, planSize: n, totalVolume: 0, joinDate: Date.now() };
+      try { await setDoc(doc(db, 'artifacts', APP, 'users', c.user.uid, 'profile', 'data'), prof); } catch (e) { console.error(e); }
+      regBusy = false; await boot(c.user);
+    }
+  } catch (err) { regBusy = false; skipLock = false; $('a-err').textContent = errMap[err.code] || err.message; $('a-err').classList.remove('hidden'); }
+  btn.disabled = false; btn.textContent = mode === 'login' ? 'Σύνδεση' : 'Δημιουργία λογαριασμού';
+});
+$('a-forgot').onclick = async () => {
+  const em = $('a-email').value.trim(); if (!em) { $('a-err').textContent = 'Γράψε πρώτα το email σου.'; $('a-err').classList.remove('hidden'); return; }
+  try { await sendPasswordResetEmail(auth, em); toast('Σου στείλαμε email επαναφοράς'); } catch (err) { $('a-err').textContent = errMap[err.code] || err.message; $('a-err').classList.remove('hidden'); }
+};
+const logout = async () => { S.active = null; await signOut(auth); location.reload(); };
+$('s-out').onclick = logout; $('lock-out').onclick = logout;
+
+onAuthStateChanged(auth, async u => { if (regBusy) return; if (u) await boot(u); else { user = null; $('app').classList.add('hidden'); $('fab').classList.add('hidden'); $('nav').classList.add('hidden'); $('auth').classList.remove('hidden'); } });
+
+async function boot(u) {
+  user = u;
+  try {
+    const ps = await getDoc(profRef()); if (ps.exists()) S.profile = { ...S.profile, ...ps.data() };
+    if (!P().planSize) P().planSize = 12;
+    const rd = async n => (await getDocs(col(n))).docs.map(d => ({ id: d.id, ...d.data() }));
+    S.workouts = (await rd('workouts')).sort((a, b) => b.date - a.date);
+    S.routines = (await rd('routines')).sort((a, b) => (a.order || 0) - (b.order || 0));
+    S.cal = await rd('calendar');
+    S.renew = await rd('renewals');
+  } catch (err) { console.error(err); toast('Σφάλμα φόρτωσης δεδομένων'); }
+  $('auth').classList.add('hidden'); $('app').classList.remove('hidden'); $('fab').classList.remove('hidden'); $('nav').classList.remove('hidden');
+  refresh(); lockIfNeeded();
+}
+
+/* ---------- Κλείδωμα: Face ID / Touch ID → PIN → κωδικός λογαριασμού ---------- */
+const bioKey = () => 'fe_bio_' + user?.uid, pinKey = () => 'fe_pin_' + user?.uid, failKey = () => 'fe_fail_' + user?.uid;
+const b64 = b => btoa(String.fromCharCode(...new Uint8Array(b)));
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const rnd = () => crypto.getRandomValues(new Uint8Array(32));
+const sha = async (pin, salt) => b64(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(salt + pin)));
+let skipLock = false, lk = { mode: 'unlock', buf: '', first: '' };
+
+async function bioEnable() {
+  const c = await navigator.credentials.create({ publicKey: { challenge: rnd(), rp: { name: 'Fitness Elite' }, user: { id: crypto.getRandomValues(new Uint8Array(16)), name: user.email, displayName: P().name }, pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }], authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'discouraged' }, attestation: 'none', timeout: 60000 } });
+  localStorage.setItem(bioKey(), b64(c.rawId));
+}
+async function bioUnlock() {
+  try {
+    await navigator.credentials.get({ publicKey: { challenge: rnd(), allowCredentials: [{ type: 'public-key', transports: ['internal'], id: unb64(localStorage.getItem(bioKey())) }], userVerification: 'required', timeout: 60000 } });
+    localStorage.removeItem(failKey()); $('lock').classList.add('hidden');
+  } catch { toast(localStorage.getItem(pinKey()) ? 'Δεν πέτυχε. Δοκίμασε το PIN' : 'Το ξεκλείδωμα ακυρώθηκε'); }
+}
+const dots = () => $('lk-dots').innerHTML = [0, 1, 2, 3].map(i => `<i class="w-3.5 h-3.5 rounded-full ${i < lk.buf.length ? 'bg-brand' : 'bg-[#2c2c30]'}"></i>`).join('');
+function showLock(mode) {
+  lk = { mode, buf: '', first: '' };
+  const hasPin = !!localStorage.getItem(pinKey()), hasBio = false, un = mode === 'unlock';
+  $('lk-msg').textContent = !un ? 'Διάλεξε νέο PIN (4 ψηφία)' : hasPin ? 'Εισήγαγε PIN' : 'Η εφαρμογή είναι κλειδωμένη';
+  $('lk-pad').classList.toggle('hidden', un && !hasPin); $('lk-dots').classList.toggle('hidden', un && !hasPin);
+  $('lock-btn').classList.toggle('hidden', !un || !hasBio);
+  $('lock-out').classList.toggle('hidden', !un); $('lk-cancel').classList.toggle('hidden', un);
+  dots(); $('lock').classList.remove('hidden');
+  if (un && hasBio) setTimeout(bioUnlock, 300);
+}
+function lockIfNeeded() {
+  if (user && !skipLock && localStorage.getItem(pinKey())) showLock('unlock');
+  skipLock = false;
+}
+$('lk-pad').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'].map(k => k ? `<button data-k="${k}" class="btn !p-4 text-xl">${k}</button>` : '<div></div>').join('');
+$('lk-pad').onclick = async e => {
+  const k = e.target.closest('[data-k]')?.dataset.k; if (!k) return;
+  if (k === '⌫') lk.buf = lk.buf.slice(0, -1); else if (lk.buf.length < 4) lk.buf += k;
+  dots(); navigator.vibrate?.(8);
+  if (lk.buf.length < 4) return;
+  const pin = lk.buf; lk.buf = '';
+  if (lk.mode === 'unlock') {
+    const { salt, hash } = JSON.parse(localStorage.getItem(pinKey()));
+    if (await sha(pin, salt) === hash) { localStorage.removeItem(failKey()); $('lock').classList.add('hidden'); }
+    else {
+      const n = (+localStorage.getItem(failKey()) || 0) + 1; localStorage.setItem(failKey(), n); navigator.vibrate?.(200);
+      if (n >= 5) { [pinKey(), bioKey(), failKey()].forEach(x => localStorage.removeItem(x)); toast('Πολλά λάθη. Συνδέσου με τον κωδικό σου.'); setTimeout(logout, 900); return; }
+      toast(`Λάθος PIN · απομένουν ${5 - n}`);
+    }
+  } else if (lk.mode === 'set1') { lk.first = pin; lk.mode = 'set2'; $('lk-msg').textContent = 'Επανάλαβε το PIN'; }
+  else if (pin === lk.first) {
+    const salt = b64(rnd()); localStorage.setItem(pinKey(), JSON.stringify({ salt, hash: await sha(pin, salt) }));
+    $('lock').classList.add('hidden'); toast('Το PIN ορίστηκε'); renderBio();
+  } else { lk.mode = 'set1'; lk.first = ''; $('lk-msg').textContent = 'Δεν ταίριαξαν. Διάλεξε ξανά PIN'; }
+  dots();
+};
+$('lk-cancel').onclick = () => $('lock').classList.add('hidden');
+$('lock-btn').onclick = bioUnlock;
+document.addEventListener('visibilitychange', () => { if (document.hidden) lastHidden = Date.now(); else if (lastHidden && Date.now() - lastHidden > 30000) lockIfNeeded(); });
+$('s-bio').onclick = async () => {
+  if (localStorage.getItem(bioKey())) { localStorage.removeItem(bioKey()); toast('Το Face ID / Touch ID απενεργοποιήθηκε'); renderBio(); return; }
+  if (!window.PublicKeyCredential) { toast('Η συσκευή δεν το υποστηρίζει'); return; }
+  try { await bioEnable(); toast('Ενεργοποιήθηκε'); if (!localStorage.getItem(pinKey())) showLock('set1'); } catch { toast('Δεν ολοκληρώθηκε η ενεργοποίηση'); }
+  renderBio();
+};
+$('s-pin').onclick = async () => {
+  if (!localStorage.getItem(pinKey())) return showLock('set1');
+  const r = await ask('PIN', 'Τι θέλεις να κάνεις;', [['Αλλαγή PIN', 'c', 'pri'], ['Διαγραφή PIN', 'd', 'dng'], ['Άκυρο', 'n']]);
+  if (r === 'c') showLock('set1'); else if (r === 'd') { localStorage.removeItem(pinKey()); toast('Το PIN διαγράφηκε'); renderBio(); }
+};
+function renderBio() {
+  $('s-bio-t').textContent = localStorage.getItem(bioKey()) ? 'Απενεργοποίηση Face ID / Touch ID' : 'Ενεργοποίηση Face ID / Touch ID';
+  $('s-pin-t').textContent = localStorage.getItem(pinKey()) ? 'Αλλαγή / Διαγραφή PIN' : 'Ορισμός PIN';
+}
+
+/* ---------- Render ---------- */
+function buildHist() {
+  hist = {}; const names = new Set();
+  [...S.workouts].reverse().forEach(w => (w.exercises || []).forEach(e => { const k = (e.name || '').trim().toLowerCase(); if (k && e.sets?.length) { hist[k] = { sets: e.sets, date: w.date }; names.add(e.name.trim()); } }));
+  S.routines.forEach(r => r.exercises.forEach(e => e.name && names.add(e.name.trim())));
+  $('ex-list').innerHTML = [...names].map(n => `<option value="${esc(n)}">`).join('');
+}
+function refresh() {
+  buildHist(); const p = P();
+  $('h-hello').textContent = 'Γεια, ' + (p.name || '').split(' ')[0];
+  $('h-date').textContent = new Date().toLocaleDateString('el-GR', { weekday: 'long', day: 'numeric', month: 'long' });
+  $('h-av').textContent = (p.name || 'A').charAt(0).toUpperCase();
+  renderDash(); renderRoutines(); renderHistory(); fillSettings(); renderBio();
+  $('fab-i').className = S.active ? 'ph-fill ph-play text-2xl' : 'ph ph-plus text-3xl';
+}
+function dayMap() {
+  const m = {}; S.workouts.forEach(w => (m[dk(w.date)] ??= []).push({ t: 'w', w })); S.cal.forEach(c => (m[c.date] ??= []).push({ t: c.kind, c })); return m;
+}
+let calOff = 0;
+function calHTML(M, td) {
+  const now = new Date(), f = new Date(now.getFullYear(), now.getMonth() - calOff, 1), dim = new Date(f.getFullYear(), f.getMonth() + 1, 0).getDate();
+  let cells = '<div></div>'.repeat((f.getDay() + 6) % 7), cnt = 0;
+  for (let d = 1; d <= dim; d++) {
+    const key = dk(new Date(f.getFullYear(), f.getMonth(), d)), it = M[key] || [], done = it.some(i => i.t !== 'plan'), plan = it.some(i => i.t === 'plan'); if (done) cnt++;
+    cells += `<button data-day="${key}" class="day ${done ? 'done' : plan ? 'plan' : ''} ${key === td ? 'today' : ''}">${d}</button>`;
+  }
+  return `<div class="w-full"><div class="flex justify-between items-center mb-3"><button id="cal-p" class="w-9 h-9 rounded-full bg-[#1c1c1f]"><i class="ph ph-caret-left"></i></button><div class="text-center"><b class="capitalize">${f.toLocaleDateString('el-GR', { month: 'long', year: 'numeric' })}</b><div class="text-brand-light text-xs font-semibold">${cnt} προπονήσεις</div></div><button id="cal-n" class="w-9 h-9 rounded-full bg-[#1c1c1f]"><i class="ph ph-caret-right"></i></button></div><div class="grid grid-cols-7 gap-1.5">${cells}</div></div>`;
+}
+function renderDash() {
+  const p = P(), sub = p.subscription, plan = p.planSize || 12;
+  $('d-subs').textContent = sub;
+  $('d-ring').setAttribute('stroke-dasharray', `${Math.max(0, Math.min(100, sub / plan * 100))},100`);
+  $('d-ring').setAttribute('stroke', sub <= 0 ? '#ef5350' : '#c62828');
+  $('d-sub-t').textContent = sub < 0 ? 'Χρωστάς' : 'Συνεδρίες';
+  $('d-sub-s').textContent = sub < 0 ? `${-sub} συνεδρίες` : sub === 0 ? 'Το πακέτο έληξε' : 'Απομένουν';
+  $('d-weight').textContent = p.weight || '--'; $('d-age').textContent = age(p.dob); $('d-height').textContent = p.height || '--';
+  $('d-vol').textContent = (p.totalVolume || 0).toLocaleString('el-GR');
+  const M = dayMap(), td = dk(new Date());
+  $('cal').innerHTML = calHTML(M, td);
+  let streak = 0, c = new Date(); c.setHours(12, 0, 0, 0);
+  if (!(M[dk(c)] || []).some(i => i.t !== 'plan')) c.setDate(c.getDate() - 1);
+  while ((M[dk(c)] || []).some(i => i.t !== 'plan')) { streak++; c.setDate(c.getDate() - 1); }
+  $('d-streak').textContent = `${streak} ${streak === 1 ? 'ημέρα' : 'ημέρες'} στη σειρά`;
+  const up = S.cal.filter(x => x.kind === 'plan' && x.date >= td).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 3);
+  $('d-up').innerHTML = up.length ? up.map(x => `<button data-day="${x.date}" class="w-full flex justify-between items-center bg-[#1c1c1f] rounded-xl px-4 py-3 text-left"><span class="font-semibold text-sm">${x.time ? x.time + ' · ' : ''}${esc(x.name)}</span><span class="text-xs text-brand-light">${new Date(x.date + 'T12:00').toLocaleDateString('el-GR', { weekday: 'short', day: 'numeric', month: 'short' })}</span></button>`).join('') : '<p class="text-sm text-gray-500">Δεν υπάρχει προγραμματισμένη προπόνηση. Πάτα μια μέρα στο ημερολόγιο.</p>';
+}
+$('cal').addEventListener('click', e => { if (e.target.closest('#cal-p')) { calOff++; renderDash(); } else if (e.target.closest('#cal-n')) { calOff--; renderDash(); } });
+document.addEventListener('click', e => { const b = e.target.closest('[data-day]'); if (b) openDay(b.dataset.day); });
+
+function openDay(key) {
+  dayKey = key; const items = dayMap()[key] || [];
+  $('day-t').textContent = new Date(key + 'T12:00').toLocaleDateString('el-GR', { weekday: 'long', day: 'numeric', month: 'long' });
+  $('day-list').innerHTML = items.map(i => i.t === 'w'
+    ? `<button data-w="${i.w.id}" class="w-full flex justify-between bg-[#1c1c1f] rounded-xl px-4 py-3 text-left"><b class="text-sm">${esc(i.w.name)}</b><span class="text-xs text-gray-400">${i.w.volume.toLocaleString('el-GR')} kg</span></button>`
+    : `<div class="flex justify-between items-center bg-[#1c1c1f] rounded-xl px-4 py-3"><span class="text-sm"><b>${i.c.time ? i.c.time + ' · ' : ''}${esc(i.c.name)}</b> <span class="text-xs ${i.t === 'plan' ? 'text-brand-light' : 'text-gray-400'}">${i.t === 'plan' ? 'προγραμματισμένη' : 'έγινε'}</span></span><button data-del="${i.c.id}" class="text-gray-500 px-2"><i class="ph ph-trash"></i></button></div>`).join('');
+  $('day-name').value = ''; $('day-time').value = ''; $('day-first').checked = false;
+  $('day-routine').innerHTML = '<option value="">Χωρίς ρουτίνα</option>' + S.routines.map(r => `<option value="${r.id}">${esc(r.name)}</option>`).join('');
+  openSheet('sheet-day');
+}
+$('day-list').addEventListener('click', async e => {
+  const w = e.target.closest('[data-w]'), d = e.target.closest('[data-del]');
+  if (w) { closeSheet('sheet-day'); openDetail(S.workouts.find(x => x.id === w.dataset.w)); }
+  if (d) { await deleteDoc(ref('calendar', d.dataset.del)); S.cal = S.cal.filter(x => x.id !== d.dataset.del); renderDash(); openDay(dayKey); }
+});
+function pkgInfo() {
+  const size = P().planSize || 12, m = {}; let k = 1, no = 0;
+  [...S.workouts].sort((a, b) => a.date - b.date).forEach(w => { if (w.pkgStart && no > 0) { k++; no = 0; } no++; if (no > size) { k++; no = 1; } m[w.id] = { k, no }; });
+  return m;
+}
+async function addPast() {
+  const rt = S.routines.find(r => r.id === $('day-routine').value), t = $('day-time').value;
+  const date = new Date(dayKey + 'T' + (t || '12:00')).getTime();
+  const exs = rt ? rt.exercises.map(e => ({ name: e.name || 'Χωρίς όνομα', ss: e.ss || '', sets: e.sets.map(s => ({ kg: parseFloat(String(s.kg).replace(',', '.')) || 0, reps: parseInt(s.reps) || 0 })) })) : [];
+  const vol = exs.reduce((a, e) => a + e.sets.reduce((b, s) => b + s.kg * s.reps, 0), 0);
+  const id = gid(), wk = { name: $('day-name').value.trim() || (rt ? rt.name : 'Προπόνηση'), date, duration: 0, volume: vol, exercises: exs, manual: true, pkgStart: $('day-first').checked, time: t || '' };
+  const sub = P().subscription - 1, tv = (P().totalVolume || 0) + vol;
+  try {
+    const b = writeBatch(db); b.set(ref('workouts', id), wk); b.set(profRef(), { subscription: sub, totalVolume: tv }, { merge: true }); await b.commit();
+    S.workouts.push({ id, ...wk }); S.workouts.sort((a, b) => b.date - a.date); P().subscription = sub; P().totalVolume = tv;
+    refresh(); openDay(dayKey); toast('Καταγράφηκε');
+  } catch { toast('Αποτυχία αποθήκευσης'); }
+}
+ 
+async function addCal(kind) {
+  const c = { date: dayKey, kind, time: $('day-time').value || '', name: $('day-name').value.trim() || (kind === 'plan' ? 'Προπόνηση' : 'Προπόνηση') }, id = gid();
+  try { await setDoc(ref('calendar', id), c); S.cal.push({ id, ...c }); renderDash(); openDay(dayKey); toast(kind === 'plan' ? 'Προγραμματίστηκε' : 'Καταγράφηκε'); } catch { toast('Αποτυχία αποθήκευσης'); }
+}
+$('day-done').onclick = addPast; $('day-plan').onclick = () => addCal('plan');
+
+function go(t) {
+  document.querySelectorAll('.nav-btn').forEach(b => { const on = b.dataset.t === t; b.classList.toggle('on', on); const i = b.querySelector('i'); i.classList.toggle('ph-fill', on); i.classList.toggle('ph', !on); });
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('hidden', v.id !== 'v-' + t));
+  document.querySelector('main').scrollTop = 0;
+}
+document.querySelectorAll('.nav-btn').forEach(b => b.onclick = () => go(b.dataset.t));
+
+function renderRoutines() {
+  $('rt-list').innerHTML = S.routines.length ? S.routines.map(r => `<div class="card p-4 flex items-center gap-2" data-id="${r.id}"><div class="flex-1 min-w-0"><b class="block truncate">${esc(r.name)}</b><span class="text-xs text-gray-500">${r.exercises.length} ασκήσεις</span></div>
+    <button class="rt-del w-10 h-10 rounded-full bg-[#1c1c1f] text-gray-500"><i class="ph ph-trash"></i></button><button class="rt-edit w-10 h-10 rounded-full bg-[#1c1c1f] text-gray-300"><i class="ph ph-pencil-simple"></i></button><button class="rt-go w-10 h-10 rounded-full bg-brand"><i class="ph-fill ph-play"></i></button></div>`).join('')
+    : '<div class="card p-8 text-center text-gray-500 text-sm border-dashed">Δεν έχεις ρουτίνες ακόμα.<br>Πάτα + για να φτιάξεις μία.</div>';
+}
+$('rt-list').addEventListener('click', async e => {
+  const c = e.target.closest('[data-id]'), b = e.target.closest('button'); if (!c || !b) return; const id = c.dataset.id;
+  if (b.classList.contains('rt-go')) tryStart(() => beginWorkout(id));
+  if (b.classList.contains('rt-edit')) editRoutine(id);
+  if (b.classList.contains('rt-del')) { const r = await ask('Διαγραφή ρουτίνας', 'Θα διαγραφεί οριστικά.', [['Διαγραφή', 'y', 'dng'], ['Άκυρο', 'n']]); if (r === 'y') { await deleteDoc(ref('routines', id)); S.routines = S.routines.filter(x => x.id !== id); refresh(); } }
+});
+$('rt-new').onclick = () => editRoutine(null);
+
+function renderHistory() {
+  const W = S.workouts, size = P().planSize || 12, tot = W.length, PK = pkgInfo(); $('hi-n').textContent = tot;
+  const items = [...W.map((w, i) => ({ t: 'w', w, d: w.date, n: tot - i })), ...(S.renew || []).map(r => ({ t: 'r', r, d: r.date }))].sort((a, b) => b.d - a.d);
+  let cur = '', pk = 0, out = '';
+  items.forEach(it => {
+    const m = new Date(it.d).toLocaleDateString('el-GR', { month: 'long', year: 'numeric' });
+    if (m !== cur) { cur = m; out += `<h3 class="text-xs font-bold text-gray-500 uppercase mt-4 mb-1 pl-1">${m}</h3>`; }
+    if (it.t === 'r') { out += `<button data-rn="${it.r.id}" class="w-full text-left rounded-2xl p-3 flex items-center gap-3 border border-dashed border-brand-light bg-brand/10"><i class="ph-fill ph-credit-card text-2xl text-brand-light"></i><div><b class="text-sm">Ανανέωση πακέτου</b><span class="block text-xs text-gray-400">${new Date(it.d).toLocaleDateString('el-GR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} · +${it.r.n} συνεδρίες</span></div></button>`; return; }
+    const w = it.w, { k, no } = PK[w.id];
+    if (k !== pk) { pk = k; out += `<div class="text-[11px] font-bold text-brand-light mt-3 pl-1">ΠΑΚΕΤΟ ${k}</div>`; }
+    out += `<button data-hw="${w.id}" class="card w-full p-4 flex justify-between items-center text-left"><div><div class="flex items-center gap-2"><b>${esc(w.name)}</b><span class="text-[10px] bg-brand/10 text-brand-light px-1.5 py-0.5 rounded font-bold">#${no}/${size}</span>${no === 1 ? '<span class="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-bold">ΑΡΧΗ ΠΑΚΕΤΟΥ</span>' : ''}</div><span class="text-xs text-gray-500">${new Date(w.date).toLocaleDateString('el-GR', { weekday: 'short', day: 'numeric', month: 'short' })} ${w.time ? ' · ' + w.time : ''}· ${(w.exercises || []).length} ασκήσεις</span></div><div class="text-right"><b class="text-lg">${w.volume.toLocaleString('el-GR')}</b><span class="block text-[10px] text-gray-500">${w.duration ? Math.round(w.duration / 60000) + ' λεπτά' : 'καταχώρηση'}</span></div></button>`;
+  });
+  $('hi-list').innerHTML = tot ? out : '<p class="text-center text-gray-500 py-10">Δεν υπάρχει ιστορικό ακόμα.</p>';
+}
+$('hi-list').addEventListener('click', e => { const b = e.target.closest('[data-hw]'); if (b) openDetail(S.workouts.find(w => w.id === b.dataset.hw)); });
+$('hi-list').addEventListener('click', async e => {
+  const b = e.target.closest('[data-rn]'); if (!b) return;
+  const r = await ask('Ανανέωση πακέτου', 'Να διαγραφεί αυτή η εγγραφή από το ιστορικό; (Δεν αλλάζει τις συνεδρίες σου.)', [['Διαγραφή εγγραφής', 'y', 'dng'], ['Άκυρο', 'n']]);
+  if (r !== 'y') return;
+  try { await deleteDoc(ref('renewals', b.dataset.rn)); S.renew = S.renew.filter(x => x.id !== b.dataset.rn); refresh(); toast('Διαγράφηκε'); } catch { toast('Αποτυχία διαγραφής'); }
+});
+
+function openDetail(w) {
+  if (!w) return;
+  $('de-t').textContent = w.name; $('de-d').textContent = new Date(w.date).toLocaleDateString('el-GR', { weekday: 'long', day: 'numeric', month: 'long' });
+  $('de-v').textContent = w.volume.toLocaleString('el-GR') + ' kg'; $('de-m').textContent = (w.duration ? Math.round(w.duration / 60000) + ' λ' : '—'); { const q = pkgInfo()[w.id]; $('de-n').textContent = q ? '#' + q.no + '/' + (P().planSize || 12) : '-'; }
+  $('de-ex').innerHTML = (w.exercises || []).map(ex => `<div class="bg-[#1c1c1f] rounded-2xl p-4"><div class="flex items-center gap-2 mb-2"><b class="text-sm">${esc(ex.name)}</b>${ex.ss ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded" style="background:${SSC[ex.ss]}33;color:${SSC[ex.ss]}">Σούπερ σετ ${ex.ss}</span>` : ''}</div>${ex.sets.map((s, i) => `<div class="flex justify-between text-sm py-1 border-b border-[#26262a] last:border-0"><span class="text-gray-500 text-xs">Σετ ${i + 1}</span><b>${s.kg} kg × ${s.reps}</b></div>`).join('')}</div>`).join('') || '<p class="text-gray-500 text-sm">Καταγράφηκε χωρίς ασκήσεις.</p>';
+  $('de-del').onclick = async () => {
+    const r = await ask('Διαγραφή προπόνησης', 'Να επιστραφεί και η συνεδρία στο πακέτο;', [['Διαγραφή & επιστροφή συνεδρίας', 'r', 'pri'], ['Διαγραφή μόνο', 'd'], ['Άκυρο', 'n']]);
+    if (r === 'n' || !r) return;
+    try {
+      await deleteDoc(ref('workouts', w.id)); S.workouts = S.workouts.filter(x => x.id !== w.id);
+      P().totalVolume = Math.max(0, (P().totalVolume || 0) - (w.volume || 0)); if (r === 'r') P().subscription++;
+      await saveProfile(); closeSheet('sheet-detail'); refresh(); toast('Διαγράφηκε');
+    } catch { toast('Αποτυχία διαγραφής'); }
+  };
+  openSheet('sheet-detail');
+}
+
+/* ---------- Settings ---------- */
+function fillSettings() {
+  const p = P(); $('s-name').value = p.name || ''; $('s-w').value = p.weight || ''; $('s-h').value = p.height || ''; $('s-dob').value = p.dob || '';
+  $('s-subs').value = p.subscription; $('s-plan').value = p.planSize || 12; $('s-cur').textContent = p.subscription;
+}
+$('s-minus').onclick = () => $('s-subs').value = (parseInt($('s-subs').value) || 0) - 1;
+$('s-plus').onclick = () => $('s-subs').value = (parseInt($('s-subs').value) || 0) + 1;
+$('s-save').onclick = async () => {
+  const p = P(); p.name = $('s-name').value.trim() || 'Athlete'; p.weight = parseFloat($('s-w').value) || 0; p.height = parseInt($('s-h').value) || 0; p.dob = $('s-dob').value;
+  p.subscription = parseInt($('s-subs').value) || 0; p.planSize = parseInt($('s-plan').value) || 12;
+  try { await saveProfile(); refresh(); toast('Αποθηκεύτηκε'); } catch { toast('Αποτυχία αποθήκευσης'); }
+};
+async function renew() {
+  const p = P(), n = p.planSize || 12, cur = p.subscription, nw = cur + n;
+  const r = await ask('Ανανέωση πακέτου', `${cur < 0 ? `Χρωστάς ${-cur} συνεδρίες, θα αφαιρεθούν από το νέο πακέτο.<br>` : ''}Προστίθενται ${n} συνεδρίες.<br><b class="text-white">Νέο υπόλοιπο: ${nw}</b>`, [['Ανανέωση', 'y', 'pri'], ['Άκυρο', 'n']]);
+  if (r !== 'y') return false;
+  try { p.subscription = nw; await saveProfile(); const rid = gid(), rec = { date: Date.now(), n }; await setDoc(ref('renewals', rid), rec); (S.renew ||= []).push({ id: rid, ...rec }); refresh(); toast('Το πακέτο ανανεώθηκε'); return true; } catch { p.subscription = cur; toast('Αποτυχία ανανέωσης'); return false; }
+}
+$('d-renew').onclick = renew; $('s-renew').onclick = renew;
+$('s-csv').onclick = () => {
+  const rows = [['Ημερομηνία', 'Προπόνηση', 'Άσκηση', 'Σετ', 'Κιλά', 'Επαναλήψεις', 'Όγκος']];
+  [...S.workouts].reverse().forEach(w => (w.exercises || []).forEach(e => e.sets.forEach((s, i) => rows.push([dk(w.date), w.name, e.name, i + 1, s.kg, s.reps, s.kg * s.reps]))));
+  const csv = '\ufeff' + rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); a.download = 'fitness-elite.csv'; a.click();
+};
+
+/* ---------- Start flow ---------- */
+const draftKey = () => 'fe_draft_' + user.uid;
+const draft = () => { if (S.active && !S.active.isRoutine && user) localStorage.setItem(draftKey(), JSON.stringify(S.active)); };
+async function tryStart(next) {
+  if (S.active) { openOverlay(); return; }
+  const sub = P().subscription;
+  if (sub <= 0) {
+    const r = await ask(`Έληξαν οι ${P().planSize} προπονήσεις`, sub < 0 ? `Χρωστάς ήδη ${-sub} ${-sub === 1 ? 'συνεδρία' : 'συνεδρίες'}.` : 'Το πακέτο σου τελείωσε. Ανανέωσε ή συνέχισε και θα καταγραφεί ως οφειλή.', [['Ανανέωση', 'renew', 'pri'], ['Παράλειψη (θα χρωστάω)', 'skip'], ['Άκυρο', null]]);
+    if (r === 'renew') { if (!(await renew())) return; } else if (r !== 'skip') return;
+  } else if (sub <= 2) await ask('Λήγει το πακέτο', `Μένουν μόνο <b class="text-white">${sub}</b> ${sub === 1 ? 'συνεδρία' : 'συνεδρίες'} πριν τη λήξη.`, [['Εντάξει', 'ok', 'pri']]);
+  next();
+}
+$('fab').onclick = async () => {
+  if (S.active) { openOverlay(); return; }
+  const d = localStorage.getItem(draftKey());
+  if (d) {
+    const r = await ask('Ανοιχτή προπόνηση', 'Έχεις μια προπόνηση που δεν ολοκληρώθηκε.', [['Συνέχεια', 'r', 'pri'], ['Διαγραφή', 'd', 'dng']]);
+    if (r === 'r') { S.active = JSON.parse(d); beginUI(); return; } localStorage.removeItem(draftKey());
+  }
+  tryStart(() => {
+    $('st-list').innerHTML = S.routines.length ? S.routines.map(r => `<button data-r="${r.id}" class="w-full bg-[#1c1c1f] rounded-xl p-4 flex justify-between items-center text-left"><span><b class="text-sm block">${esc(r.name)}</b><span class="text-[11px] text-gray-500">${r.exercises.length} ασκήσεις</span></span><i class="ph-fill ph-play-circle text-2xl text-brand-light"></i></button>`).join('') : '<p class="text-xs text-gray-500 text-center py-2">Δεν υπάρχουν ρουτίνες.</p>';
+    openSheet('sheet-start');
+  });
+};
+$('st-list').addEventListener('click', e => { const b = e.target.closest('[data-r]'); if (b) { closeSheet('sheet-start'); beginWorkout(b.dataset.r); } });
+$('st-empty').onclick = () => { closeSheet('sheet-start'); beginWorkout(null); };
+
+const newEx = () => ({ id: gid(), name: '', ss: '', sets: [{ id: gid(), kg: '', reps: '', done: false }] });
+function beginWorkout(rid) {
+  const rt = rid && S.routines.find(r => r.id === rid);
+  S.active = { isRoutine: false, id: gid(), name: rt ? rt.name : 'Προπόνηση', startTime: Date.now(), exercises: rt ? rt.exercises.map(e => ({ id: gid(), name: e.name, ss: e.ss || '', sets: e.sets.map(s => ({ id: gid(), kg: s.kg, reps: s.reps, done: false })) })) : [] };
+  beginUI();
+}
+function beginUI() {
+  $('wk-title').value = S.active.name; $('wk-title').placeholder = 'Όνομα προπόνησης'; $('wk-clock').classList.remove('hidden'); $('wk-finish').textContent = 'Τέλος';
+  renderEditor(); openOverlay(); draft(); refresh();
+}
+function editRoutine(id) {
+  const ex = id && S.routines.find(r => r.id === id);
+  S.active = ex ? { ...JSON.parse(JSON.stringify(ex)), isRoutine: true } : { isRoutine: true, id: gid(), name: '', exercises: [] };
+  S.active.exercises.forEach(e => e.sets.forEach(s => s.id = s.id || gid())); S.active.exercises.forEach(e => e.id = e.id || gid());
+  $('wk-title').value = S.active.name; $('wk-title').placeholder = 'Όνομα ρουτίνας'; $('wk-clock').classList.add('hidden'); $('wk-finish').textContent = 'Αποθήκευση';
+  renderEditor(); openOverlay();
+}
+function openOverlay() { openSheet('overlay'); }
+function closeOverlay(discard) {
+  closeSheet('overlay');
+  if (discard) { S.active = null; if (user) localStorage.removeItem(draftKey()); }
+  refresh();
+}
+$('wk-min').onclick = () => closeOverlay(S.active?.isRoutine);
+setInterval(() => { const a = S.active; if (!a || a.isRoutine || !a.startTime) return; const d = Math.floor((Date.now() - a.startTime) / 1000); $('wk-time').textContent = `${pad(Math.floor(d / 60))}:${pad(d % 60)}`; }, 1000);
+
+/* ---------- Editor ---------- */
+const SSC = { A: '#ef5350', B: '#42a5f5', C: '#66bb6a', D: '#ffa726' };
+const prevOf = ex => { const k = (ex.name || '').trim().toLowerCase(); return k && hist[k]; };
+const lastTxt = h => h ? `Τελευταία φορά ${fd(h.date)}: ${h.sets.map(s => `${s.kg}kg×${s.reps}`).join(' · ')} <button class="copy-prev text-brand-light font-bold">↺ Αντιγραφή</button>` : '';
+function renderEditor() {
+  const a = S.active, R = a.isRoutine, box = $('wk-ex');
+  if (!a.exercises.length) { box.innerHTML = '<div class="h-40 flex flex-col items-center justify-center text-gray-600"><i class="ph ph-barbell text-5xl mb-2"></i><p>Πρόσθεσε μια άσκηση για να ξεκινήσεις</p></div>' + (R ? '' : '<button class="cancel-wk w-full text-center text-sm text-red-500 py-4">Ακύρωση προπόνησης</button>'); return; }
+  box.innerHTML = a.exercises.map(ex => {
+    const h = !R && prevOf(ex), c = SSC[ex.ss];
+    return `<div class="ex-card card p-3" data-id="${ex.id}" style="${c ? `border-left:4px solid ${c}` : ''}">
+      <div class="flex items-center gap-2"><div class="drag-handle p-2 -ml-1 text-gray-600 touch-none"><i class="ph ph-dots-six-vertical text-xl"></i></div>
+        <div class="flex-1 min-w-0"><input list="ex-list" class="ex-name bg-transparent text-lg font-bold w-full outline-none" placeholder="Όνομα άσκησης" value="${esc(ex.name)}"><div class="last text-[11px] text-gray-500">${lastTxt(h)}</div></div>
+        <button class="rm-ex w-9 h-9 rounded-full bg-red-500/10 text-red-500"><i class="ph ph-trash"></i></button></div>
+      <div class="flex items-center gap-2 mt-2 mb-3"><i class="ph ph-link text-gray-500"></i>
+        <select class="ss-sel bg-[#1c1c1f] border border-[#2c2c30] rounded-lg text-xs px-2 py-1.5 outline-none" style="color:${c || '#9a9aa0'}"><option value="">Χωρίς σούπερ σετ</option>${Object.keys(SSC).map(k => `<option value="${k}" ${ex.ss === k ? 'selected' : ''}>Σούπερ σετ ${k}</option>`).join('')}</select></div>
+      <div class="flex gap-2 px-1 mb-1 text-[10px] text-gray-500 font-bold text-center"><span class="w-7">ΣΕΤ</span><span class="flex-1">ΚΙΛΑ</span><span class="flex-1">ΕΠΑΝΑΛΗΨΕΙΣ</span>${R ? '' : '<span class="w-8"></span>'}</div>
+      <div class="space-y-2">${ex.sets.map((s, i) => setRow(ex, s, i, R, h)).join('')}</div>
+      <button class="add-set w-full mt-3 py-2.5 bg-[#1c1c1f] rounded-xl text-brand-light text-xs font-bold">+ Προσθήκη σετ</button></div>`;
+  }).join('') + (R ? '' : '<button class="cancel-wk w-full text-center text-sm text-red-500 py-4">Ακύρωση προπόνησης</button>');
+}
+const prevLine = p => p ? `Προηγ. φορά: <b class="text-gray-300">${p.kg} kg × ${p.reps} επαν.</b>` : 'Προηγ. φορά: —';
+function setRow(ex, s, i, R, h) {
+  const p = h && h.sets[i], d = s.done && !R;
+  return `<div class="set-row ${d ? 'opacity-40' : ''}" data-set="${s.id}">
+    <div class="flex items-center gap-2"><button class="rm-set w-7 text-center text-gray-500 font-bold text-sm">${i + 1}</button>
+      <input type="text" inputmode="decimal" class="kg inp text-center font-semibold" placeholder="${p ? p.kg : '-'}" value="${s.kg}" ${d ? 'disabled' : ''}>
+      <input type="number" inputmode="numeric" class="reps inp text-center font-semibold" placeholder="${p ? p.reps : '-'}" value="${s.reps}" ${d ? 'disabled' : ''}>
+      ${R ? '' : `<input type="checkbox" class="set-checkbox chk" ${d ? 'checked' : ''} ${(!s.kg || !s.reps) && !d ? 'disabled' : ''}>`}</div>
+    ${R ? '' : `<div class="prev-line text-[11px] text-gray-500 pl-9 mt-1">${prevLine(p)}</div>`}</div>`;
+}
+const box = $('wk-ex');
+const exOf = el => S.active.exercises.find(e => e.id === el.closest('.ex-card')?.dataset.id);
+const setOf = (el, ex) => ex.sets.find(s => s.id === el.closest('.set-row')?.dataset.set);
+box.addEventListener('input', e => {
+  const t = e.target; if (t.matches('.ex-name')) { exOf(t).name = t.value; draft(); return; } if (!t.matches('.kg,.reps')) return; const ex = exOf(t), s = setOf(t, ex);
+  if (t.classList.contains('kg')) t.value = t.value.replace(/,/g, '.').replace(/[^0-9.]/g, ''); s[t.classList.contains('kg') ? 'kg' : 'reps'] = t.value; const cb = t.closest('.set-row').querySelector('.chk'); if (cb) cb.disabled = !(s.kg && s.reps); draft();
+});
+box.addEventListener('change', e => {
+  const t = e.target, ex = t.closest('.ex-card') && exOf(t); if (!ex) return;
+  if (t.matches('.ex-name')) {
+   ex.name = t.value; const card = t.closest('.ex-card'), h = !S.active.isRoutine && prevOf(ex);
+   card.querySelector('.last').innerHTML = lastTxt(h);
+   card.querySelectorAll('.set-row').forEach((row, i) => { const p = h && h.sets[i]; row.querySelector('.kg').placeholder = p ? p.kg : '-'; row.querySelector('.reps').placeholder = p ? p.reps : '-'; const pl = row.querySelector('.prev-line'); if (pl) pl.innerHTML = prevLine(p); });
+  } else if (t.matches('.ss-sel')) {
+    ex.ss = t.value; const c = SSC[ex.ss]; t.style.color = c || '#9a9aa0'; t.closest('.ex-card').style.borderLeft = c ? `4px solid ${c}` : '';
+  } else if (t.matches('.chk')) {
+    const s = setOf(t, ex), row = t.closest('.set-row'); s.done = t.checked;
+    row.classList.toggle('opacity-40', s.done); row.querySelectorAll('.kg,.reps').forEach(i => i.disabled = s.done); navigator.vibrate?.(15);
+  }
+  draft();
+});
+box.addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b) return; const a = S.active;
+  if (b.classList.contains('cancel-wk')) { const r = await ask('Ακύρωση προπόνησης', 'Τα δεδομένα αυτής της προπόνησης θα χαθούν.', [['Ακύρωση προπόνησης', 'y', 'dng'], ['Συνέχεια', 'n']]); if (r === 'y') closeOverlay(true); return; }
+  const ex = exOf(b); if (!ex) return;
+  if (b.classList.contains('rm-ex')) { a.exercises = a.exercises.filter(x => x !== ex); renderEditor(); }
+  else if (b.classList.contains('add-set')) { const l = ex.sets[ex.sets.length - 1]; ex.sets.push({ id: gid(), kg: l?.kg ?? '', reps: l?.reps ?? '', done: false }); renderEditor(); }
+  else if (b.classList.contains('rm-set')) { if (ex.sets.length > 1) { ex.sets = ex.sets.filter(s => s.id !== b.closest('.set-row').dataset.set); renderEditor(); } else toast('Χρειάζεται τουλάχιστον ένα σετ'); }
+  else if (b.classList.contains('copy-prev')) { const h = prevOf(ex); if (!h) return; h.sets.forEach((p, i) => { if (!ex.sets[i]) ex.sets.push({ id: gid(), kg: '', reps: '', done: false }); if (!ex.sets[i].done) { ex.sets[i].kg = p.kg; ex.sets[i].reps = p.reps; } }); renderEditor(); }
+  else if (b.classList.contains('fill-prev')) {
+    const s = setOf(b, ex), h = prevOf(ex), p = h && h.sets[ex.sets.indexOf(s)]; if (!p || s.done) return;
+    s.kg = p.kg; s.reps = p.reps; const row = b.closest('.set-row'); row.querySelector('.kg').value = s.kg; row.querySelector('.reps').value = s.reps; row.querySelector('.chk').disabled = false;
+  }
+  draft();
+});
+$('wk-add').onclick = () => { if (!S.active) return; S.active.exercises.push(newEx()); renderEditor(); draft(); setTimeout(() => box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' }), 80); };
+if (window.Sortable) new Sortable(box, { animation: 150, handle: '.drag-handle', ghostClass: 'sortable-ghost', onEnd: () => {
+  const ids = [...box.querySelectorAll('.ex-card')].map(el => el.dataset.id);
+  S.active.exercises = ids.map(id => S.active.exercises.find(e => e.id === id)); draft();
+} });
+
+/* Rest timer (manual only) */
+let restInt, restEnd = 0, AC; const RF = $('rest-full'), RO = $('rest-open');
+const fmt = r => `${pad(Math.floor(r / 60))}:${pad(r % 60)}`;
+const showRest = on => { const r = $('rest'); r.style.opacity = on ? 1 : 0; r.style.pointerEvents = on ? 'auto' : 'none'; r.style.transform = on ? 'none' : 'translateY(20px)'; RO.style.display = on ? 'none' : 'flex'; };
+const fullRest = on => {
+  if (on) { RF.classList.remove('hidden'); requestAnimationFrame(() => requestAnimationFrame(() => { RF.style.opacity = 1; RF.style.transform = 'none'; })); }
+  else { RF.style.opacity = 0; RF.style.transform = 'translate(38%,42%) scale(.1)'; setTimeout(() => { if (RF.style.opacity == 0) RF.classList.add('hidden'); }, 400); }
+};
+function beep() { try { const o = AC.createOscillator(), g = AC.createGain(); o.connect(g); g.connect(AC.destination); o.frequency.value = 880; g.gain.value = .35; o.start(); o.stop(AC.currentTime + .6); } catch { } }
+function stopRest(done) {
+  clearInterval(restInt); restEnd = 0; fullRest(false); RO.innerHTML = '<i class="ph ph-timer text-xl"></i>';
+  if (done) { beep(); navigator.vibrate?.([300, 120, 300, 120, 300]); RO.classList.add('animate-pulse'); setTimeout(() => RO.classList.remove('animate-pulse'), 5000); }
+}
+function tick() { const r = Math.max(0, Math.ceil((restEnd - Date.now()) / 1000)); $('rf-t').textContent = fmt(r); RO.innerHTML = `<span class="text-xs font-bold">${fmt(r)}</span>`; if (r <= 0) stopRest(true); }
+function startRest(s) { AC ||= new (window.AudioContext || window.webkitAudioContext)(); AC.resume?.(); clearInterval(restInt); restEnd = Date.now() + s * 1000; showRest(false); fullRest(true); tick(); restInt = setInterval(tick, 250); }
+RO.onclick = () => restEnd ? fullRest(true) : showRest(true); $('rest-x').onclick = () => showRest(false);
+document.querySelectorAll('.rs').forEach(b => b.onclick = () => startRest(+b.dataset.s));
+$('rf-p').onclick = () => { restEnd += 15000; tick(); }; $('rf-m').onclick = () => { restEnd -= 15000; tick(); };
+$('rf-skip').onclick = () => stopRest(false); $('rf-min').onclick = () => fullRest(false);
+
+/* ---------- Save ---------- */
+$('wk-finish').onclick = async () => {
+  const a = S.active; if (!a) return; const btn = $('wk-finish'), label = btn.textContent;
+  a.name = $('wk-title').value.trim() || (a.isRoutine ? 'Ρουτίνα' : 'Προπόνηση');
+  btn.disabled = true; btn.innerHTML = '<i class="ph ph-spinner animate-spin"></i>';
+  try { a.isRoutine ? await saveRoutine() : await saveWorkout(); } catch (err) { console.error(err); toast('Αποτυχία αποθήκευσης. Έλεγξε τη σύνδεση.'); }
+  btn.disabled = false; btn.textContent = S.active ? label : (label);
+};
+async function saveRoutine() {
+  const a = S.active, ex = S.routines.find(r => r.id === a.id);
+  const data = { name: a.name, order: ex ? ex.order || 0 : S.routines.length, exercises: a.exercises.map(e => ({ name: e.name, ss: e.ss || '', sets: e.sets.map(s => ({ kg: s.kg, reps: s.reps })) })) };
+  await setDoc(ref('routines', a.id), data); const item = { id: a.id, ...data };
+  if (ex) S.routines[S.routines.indexOf(ex)] = item; else S.routines.push(item);
+  closeOverlay(true); toast('Η ρουτίνα αποθηκεύτηκε');
+}
+async function saveWorkout() {
+  const a = S.active; let vol = 0; const exs = [];
+  a.exercises.forEach(e => { const d = e.sets.filter(s => s.done); if (d.length) { d.forEach(s => vol += (parseFloat(s.kg) || 0) * (parseInt(s.reps) || 0)); exs.push({ name: e.name || 'Χωρίς όνομα', ss: e.ss || '', sets: d.map(s => ({ kg: parseFloat(s.kg) || 0, reps: parseInt(s.reps) || 0 })) }); } });
+  if (!exs.length) { await ask('Καμία ολοκληρωμένη σειρά', 'Τσέκαρε τα σετ που έκανες για να αποθηκευτεί η προπόνηση.', [['Εντάξει', 'ok', 'pri']]); return; }
+  const id = gid(), wk = { name: a.name, date: Date.now(), duration: Date.now() - a.startTime, volume: vol, sessionNumber: S.workouts.length + 1, exercises: exs };
+  const sub = P().subscription - 1, tv = (P().totalVolume || 0) + vol;
+  const batch = writeBatch(db); batch.set(ref('workouts', id), wk); batch.set(profRef(), { subscription: sub, totalVolume: tv }, { merge: true }); await batch.commit();
+  S.workouts.unshift({ id, ...wk }); P().subscription = sub; P().totalVolume = tv;
+  closeOverlay(true); go('dash'); toast('Η προπόνηση καταγράφηκε!');
+}
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
+setMode('login'); go('dash');
+{ const pr = document.createElement('div'); pr.style.cssText = 'position:fixed;bottom:0;padding-bottom:env(safe-area-inset-bottom,0px)'; document.body.appendChild(pr); const sb = getComputedStyle(pr).paddingBottom; pr.remove(); $('dbg').textContent = `inner ${innerWidth}x${innerHeight} · screen ${screen.width}x${screen.height} · safe-bottom ${sb} · standalone ${navigator.standalone}`; }
+</script>
+</body>
+</html>.sheet>.panel{transform:translateY(100%);transition:transform .28s cubic-bezier(.16,1,.3,1)}
 .sheet.show>.panel{transform:none}
 .pb-safe{padding-bottom:calc(20px + var(--sb))}
 .set-checkbox{appearance:none;width:32px;height:32px;border-radius:9px;background:#1c1c1f;border:2px solid #3a3a3c;display:grid;place-content:center;flex-shrink:0}
