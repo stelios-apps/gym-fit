@@ -25,6 +25,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/@phosphor-icons/web"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script>tailwind.config={theme:{extend:{fontFamily:{sans:['Inter','sans-serif']},colors:{brand:{DEFAULT:'#c62828',light:'#ef5350'}}}}}</script>
 <style>
@@ -115,8 +116,13 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;displa
 <div id="app" class="hidden flex-1 flex flex-col min-h-0">
   <header class="px-5 pt-4 pb-2 flex justify-between items-center">
     <div><h1 class="text-2xl font-extrabold tracking-tight" id="h-hello">Γεια σου</h1><p class="text-sm text-gray-500" id="h-date"></p></div>
-    <div class="w-11 h-11 rounded-full bg-[#1c1c1f] border border-[#2c2c30] flex items-center justify-center font-bold text-brand-light" id="h-av">A</div>
+    <div class="flex items-center gap-2">
+    <button id="h-clients" class="hidden w-9 h-9 rounded-full bg-[#1c1c1f] border border-[#2c2c30] text-brand-light"><i class="ph ph-users"></i></button>
+    <button id="h-help" class="w-9 h-9 rounded-full bg-[#1c1c1f] border border-[#2c2c30] text-gray-400"><i class="ph ph-question"></i></button>
+    <button class="w-11 h-11 rounded-full bg-[#1c1c1f] border border-[#2c2c30] flex items-center justify-center font-bold text-brand-light" id="h-av">A</button>
+    </div>
   </header>
+  <div id="vbar" class="hidden mx-5 mb-1 px-4 py-2 rounded-xl bg-brand/20 text-sm flex justify-between items-center"></div>
   <main class="flex-1 overflow-y-auto hide-scroll px-5 pt-3" style="padding-bottom:calc(120px + var(--sb))">
 
     <section id="v-dash" class="view space-y-4">
@@ -164,6 +170,20 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;displa
       </div>
       <div id="rt-list" class="space-y-3"></div>
     </section>
+<!-- TEST GRAFIMA -->
+    <section id="v-prog" class="view hidden space-y-3">
+     <h2 class="text-2xl font-bold">Πρόοδος</h2>
+     <div class="card p-4 space-y-2">
+     <div class="grid grid-cols-2 gap-2">
+      <select id="pg-g" class="inp"><option>Όλες</option><option>Στήθος</option><option>Πλάτη</option><option>Πόδια</option><option>Ώμοι</option><option>Χέρια</option><option>Κορμός</option><option>Άλλο</option></select>
+      <select id="pg-m" class="inp"><option value="both">Κιλά & επαναλήψεις</option><option value="kg">Μέγιστα κιλά</option><option value="reps">Επαναλήψεις</option><option value="vol">Όγκος</option></select>
+     </div>
+     <select id="pg-e" class="inp"></select>
+     <div style="height:280px"><canvas id="pg-c"></canvas></div>
+     <p id="pg-empty" class="hidden text-center text-sm text-gray-500 py-6">Δεν υπάρχουν δεδομένα για αυτή την επιλογή.</p>
+     </div>
+    </section>
+
 
     <section id="v-history" class="view hidden space-y-3">
       <div class="flex justify-between items-center"><h2 class="text-2xl font-bold">Ιστορικό</h2><span class="text-sm text-gray-400"><span id="hi-n">0</span> προπονήσεις</span></div>
@@ -193,6 +213,7 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;displa
         <button id="s-pin" class="btn flex items-center justify-center gap-2"><i class="ph ph-password text-xl"></i><span id="s-pin-t">Ορισμός PIN</span></button>
         <button id="s-bio" class="btn flex items-center justify-center gap-2"><i class="ph ph-fingerprint text-xl"></i><span id="s-bio-t">Face ID / Touch ID</span></button>
         <button id="s-csv" class="btn flex items-center justify-center gap-2"><i class="ph ph-file-csv text-xl"></i>Εξαγωγή σε Excel (CSV)</button>
+        <button id="s-notif" class="btn flex items-center justify-center gap-2"><i class="ph ph-bell-ringing text-xl"></i>Ειδοποίηση επιστροφής στην προπόνηση</button>
         <button id="s-out" class="btn dng">Αποσύνδεση</button>
       </div>
     </section>
@@ -205,8 +226,8 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;displa
   <button class="nav-btn on flex-1 flex flex-col items-center py-1" data-t="dash"><i class="ph-fill ph-squares-four text-2xl"></i>Αρχική</button>
   <button class="nav-btn flex-1 flex flex-col items-center py-1" data-t="routines"><i class="ph ph-clipboard-text text-2xl"></i>Ρουτίνες</button>
   <div class="w-16"></div>
+  <button class="nav-btn flex-1 flex flex-col items-center py-1" data-t="prog"><i class="ph ph-chart-line-up text-2xl"></i>Πρόοδος</button>
   <button class="nav-btn flex-1 flex flex-col items-center py-1" data-t="history"><i class="ph ph-clock-counter-clockwise text-2xl"></i>Ιστορικό</button>
-  <button class="nav-btn flex-1 flex flex-col items-center py-1" data-t="settings"><i class="ph ph-user text-2xl"></i>Προφίλ</button>
 </nav>
 
 <!-- START SHEET -->
@@ -273,6 +294,19 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;displa
   <button id="rf-skip" class="mt-4 text-white font-bold underline">Παράλειψη</button>
 </div>
 <div id="toast" class="fixed left-1/2 -translate-x-1/2 z-[120] card px-5 py-3 text-sm font-medium opacity-0 pointer-events-none transition-all" style="top:calc(20px + var(--st));transform:translate(-50%,-20px)"></div>
+<div id="sheet-clients" class="sheet hidden fixed inset-0 z-[66] bg-black/80 flex items-end"><div class="panel card !rounded-b-none w-full p-5 pb-safe">
+  <div class="flex justify-between items-center mb-3"><h2 class="text-lg font-bold">Πελάτες</h2><button data-close="sheet-clients" class="w-8 h-8 rounded-full bg-[#1c1c1f] text-gray-400"><i class="ph ph-x"></i></button></div>
+  <input id="cl-q" class="inp mb-3" placeholder="Αναζήτηση ονόματος / email">
+  <div id="cl-list" class="space-y-2 overflow-y-auto hide-scroll" style="max-height:50vh"></div>
+</div></div>
+<div id="sheet-help" class="sheet hidden fixed inset-0 z-[90] bg-black/85 flex items-end"><div class="panel card !rounded-b-none w-full p-5 pb-safe text-center">
+  <div class="flex justify-between items-center mb-2"><span id="hp-n" class="text-xs text-gray-500"></span><button data-close="sheet-help" class="w-8 h-8 rounded-full bg-[#1c1c1f] text-gray-400"><i class="ph ph-x"></i></button></div>
+  <div id="hp-i" class="w-20 h-20 mx-auto rounded-3xl bg-brand/15 flex items-center justify-center text-brand-light text-4xl mb-3"></div>
+  <h3 id="hp-t" class="text-xl font-bold mb-1"></h3>
+  <p id="hp-d" class="text-sm text-gray-400" style="min-height:96px"></p>
+  <p id="hp-a" class="text-brand-light text-sm font-semibold my-2"></p>
+  <div class="grid grid-cols-2 gap-3"><button id="hp-b" class="btn">Πίσω</button><button id="hp-nx" class="btn pri">Επόμενο</button></div>
+</div></div>
 <datalist id="ex-list"></datalist>
 
 <script type="module">
@@ -306,9 +340,13 @@ const age = d => { if (!d) return '--'; const b = new Date(d), n = new Date(); l
 let user = null, regBusy = false, hist = {}, dayKey = '', lastHidden = 0;
 let S = { profile: { name: 'Athlete', dob: '', height: 0, weight: 0, subscription: 12, planSize: 12, totalVolume: 0 }, workouts: [], routines: [], cal: [], active: null };
 const P = () => S.profile;
-const col = n => collection(db, 'artifacts', APP, 'users', user.uid, n);
-const ref = (n, id) => doc(db, 'artifacts', APP, 'users', user.uid, n, id);
-const profRef = () => doc(db, 'artifacts', APP, 'users', user.uid, 'profile', 'data');
+const TRAINERS = ['gym@test.com', 'gymnasths2@email.com']; // ΒΑΛΕ ΤΑ ΔΙΚΑ ΤΟΥΣ EMAIL, πεζά
+let viewing = null, SWR = null;
+const tuid = () => viewing || user.uid;
+const isTr = () => TRAINERS.includes((user?.email || '').toLowerCase());
+const col = n => collection(db, 'artifacts', APP, 'users', tuid(), n);
+const ref = (n, id) => doc(db, 'artifacts', APP, 'users', tuid(), n, id);
+const profRef = () => doc(db, 'artifacts', APP, 'users', tuid(), 'profile', 'data');
 const saveProfile = () => setDoc(profRef(), P(), { merge: true });
 
 /* ---------- UI helpers ---------- */
@@ -366,19 +404,24 @@ $('s-out').onclick = logout; $('lock-out').onclick = logout;
 
 onAuthStateChanged(auth, async u => { if (regBusy) return; if (u) await boot(u); else { user = null; $('app').classList.add('hidden'); $('fab').classList.add('hidden'); $('nav').classList.add('hidden'); $('auth').classList.remove('hidden'); } });
 
-async function boot(u) {
-  user = u;
+const DEF = { name: 'Athlete', dob: '', height: 0, weight: 0, subscription: 12, planSize: 12, totalVolume: 0 };
+async function loadData() {
+  S.profile = { ...DEF }; S.workouts = []; S.routines = []; S.cal = []; S.renew = [];
   try {
-    const ps = await getDoc(profRef()); if (ps.exists()) S.profile = { ...S.profile, ...ps.data() };
+    const ps = await getDoc(profRef()); if (ps.exists()) S.profile = { ...DEF, ...ps.data() };
     if (!P().planSize) P().planSize = 12;
     const rd = async n => (await getDocs(col(n))).docs.map(d => ({ id: d.id, ...d.data() }));
     S.workouts = (await rd('workouts')).sort((a, b) => b.date - a.date);
     S.routines = (await rd('routines')).sort((a, b) => (a.order || 0) - (b.order || 0));
-    S.cal = await rd('calendar');
-    S.renew = await rd('renewals');
+    S.cal = await rd('calendar'); S.renew = await rd('renewals');
   } catch (err) { console.error(err); toast('Σφάλμα φόρτωσης δεδομένων'); }
+}
+const dirSave = () => setDoc(doc(db, 'artifacts', APP, 'directory', tuid()), { name: P().name, ...(viewing ? {} : { email: user.email || '' }) }, { merge: true }).catch(() => {});
+async function boot(u) {
+  user = u; viewing = null; await loadData(); dirSave();
+  $('h-clients').classList.toggle('hidden', !isTr());
   $('auth').classList.add('hidden'); $('app').classList.remove('hidden'); $('fab').classList.remove('hidden'); $('nav').classList.remove('hidden');
-  refresh(); lockIfNeeded();
+  refresh(); lockIfNeeded(); checkDraft();
 }
 
 /* ---------- Κλείδωμα: Face ID / Touch ID → PIN → κωδικός λογαριασμού ---------- */
@@ -468,6 +511,7 @@ function refresh() {
   $('h-date').textContent = new Date().toLocaleDateString('el-GR', { weekday: 'long', day: 'numeric', month: 'long' });
   $('h-av').textContent = (p.name || 'A').charAt(0).toUpperCase();
   renderDash(); renderRoutines(); renderHistory(); fillSettings(); renderBio();
+  if (!$('v-prog').classList.contains('hidden')) renderProg();
   $('fab-i').className = S.active ? 'ph-fill ph-play text-2xl' : 'ph ph-plus text-3xl';
 }
 function dayMap() {
@@ -547,6 +591,7 @@ $('day-done').onclick = addPast; $('day-plan').onclick = () => addCal('plan');
 function go(t) {
   document.querySelectorAll('.nav-btn').forEach(b => { const on = b.dataset.t === t; b.classList.toggle('on', on); const i = b.querySelector('i'); i.classList.toggle('ph-fill', on); i.classList.toggle('ph', !on); });
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('hidden', v.id !== 'v-' + t));
+  if (t === 'prog') renderProg();
   document.querySelector('main').scrollTop = 0;
 }
 document.querySelectorAll('.nav-btn').forEach(b => b.onclick = () => go(b.dataset.t));
@@ -578,13 +623,14 @@ function renderHistory() {
   });
   $('hi-list').innerHTML = tot ? out : '<p class="text-center text-gray-500 py-10">Δεν υπάρχει ιστορικό ακόμα.</p>';
 }
-$('hi-list').addEventListener('click', e => { const b = e.target.closest('[data-hw]');
 $('hi-list').addEventListener('click', async e => {
+  const h = e.target.closest('[data-hw]');
+  if (h) { openDetail(S.workouts.find(w => w.id === h.dataset.hw)); return; }
   const b = e.target.closest('[data-rn]'); if (!b) return;
   const r = await ask('Ανανέωση πακέτου', 'Να διαγραφεί αυτή η εγγραφή από το ιστορικό; (Δεν αλλάζει τις συνεδρίες σου.)', [['Διαγραφή εγγραφής', 'y', 'dng'], ['Άκυρο', 'n']]);
   if (r !== 'y') return;
   try { await deleteDoc(ref('renewals', b.dataset.rn)); S.renew = S.renew.filter(x => x.id !== b.dataset.rn); refresh(); toast('Διαγράφηκε'); } catch { toast('Αποτυχία διαγραφής'); }
-}); if (b) openDetail(S.workouts.find(w => w.id === b.dataset.hw)); });
+});
 
 function openDetail(w) {
   if (!w) return;
@@ -613,7 +659,7 @@ $('s-plus').onclick = () => $('s-subs').value = (parseInt($('s-subs').value) || 
 $('s-save').onclick = async () => {
   const p = P(); p.name = $('s-name').value.trim() || 'Athlete'; p.weight = parseFloat($('s-w').value) || 0; p.height = parseInt($('s-h').value) || 0; p.dob = $('s-dob').value;
   p.subscription = parseInt($('s-subs').value) || 0; p.planSize = parseInt($('s-plan').value) || 12;
-  try { await saveProfile(); refresh(); toast('Αποθηκεύτηκε'); } catch { toast('Αποτυχία αποθήκευσης'); }
+  try { await saveProfile(); dirSave(); refresh(); toast('Αποθηκεύτηκε'); } catch { toast('Αποτυχία αποθήκευσης'); }
 };
 async function renew() {
   const p = P(), n = p.planSize || 12, cur = p.subscription, nw = cur + n;
@@ -798,7 +844,108 @@ async function saveWorkout() {
   S.workouts.unshift({ id, ...wk }); P().subscription = sub; P().totalVolume = tv;
   closeOverlay(true); go('dash'); toast('Η προπόνηση καταγράφηκε!');
 }
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
+
+/* ---------- Πρόοδος (γράφημα) ---------- */
+const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const GR = [
+  ['Πόδια', /ποδ|squat|σκουατ|leg|lunge|προωθ|γλουτ|μοσχ|calf|thrust|quad|hamstring/],
+  ['Ώμοι', /ωμ|shoulder|lateral|πλαγιες|military|arnold|shrug/],
+  ['Χέρια', /δικεφ|τρικεφ|biceps|triceps|curl|χερι|pushdown|σφυρ/],
+  ['Κορμός', /κοιλ|abs|plank|core|crunch|σανιδ/],
+  ['Στήθος', /στηθ|bench|chest|fly|πεταλουδ|pec|push.?up|dip/],
+  ['Πλάτη', /πλατ|row|κωπηλ|lat |pulldown|pull|μονοζυγ|deadlift|τραβηγ/]
+];
+const grpOf = n => { const k = norm(n); for (const [g, r] of GR) if (r.test(k)) return g; return 'Άλλο'; };
+let chart;
+function renderProg() {
+  if (!window.Chart) { toast('Το γράφημα δεν φόρτωσε (έλεγξε σύνδεση)'); return; }
+  const g = $('pg-g').value, names = new Map();
+  S.workouts.forEach(w => (w.exercises || []).forEach(e => { const n = (e.name || '').trim(); if (n && (g === 'Όλες' || grpOf(n) === g)) names.set(n.toLowerCase(), n); }));
+  const cur = $('pg-e').value;
+  $('pg-e').innerHTML = '<option value="">Όλες οι ασκήσεις' + (g === 'Όλες' ? '' : ' (' + g + ')') + '</option>' + [...names.entries()].sort().map(([k, n]) => `<option value="${esc(k)}">${esc(n)}</option>`).join('');
+  $('pg-e').value = names.has(cur) ? cur : '';
+  const ex = $('pg-e').value, m = $('pg-m').value, pts = [];
+  [...S.workouts].sort((a, b) => a.date - b.date).forEach(w => {
+    let kg = 0, reps = 0, vol = 0, hit = false;
+    (w.exercises || []).forEach(e => {
+      const n = (e.name || '').trim().toLowerCase(); if (!n) return;
+      if (ex ? n !== ex : (g !== 'Όλες' && grpOf(n) !== g)) return;
+      hit = true; e.sets.forEach(s => { kg = Math.max(kg, s.kg); reps += s.reps; vol += s.kg * s.reps; });
+    });
+    if (hit) pts.push({ d: fd(w.date), kg, reps, vol });
+  });
+  if (chart) { chart.destroy(); chart = null; }
+  $('pg-empty').classList.toggle('hidden', !!pts.length); if (!pts.length) return;
+  const D = [], mk = (label, data, c, y) => ({ label, data, borderColor: c, backgroundColor: c, yAxisID: y, tension: .3, pointRadius: 4 });
+  if (m === 'kg' || m === 'both') D.push(mk('Μέγιστα κιλά', pts.map(p => p.kg), '#ef5350', 'y'));
+  if (m === 'reps' || m === 'both') D.push(mk('Επαναλήψεις', pts.map(p => p.reps), '#42a5f5', m === 'both' ? 'y1' : 'y'));
+  if (m === 'vol') D.push(mk('Όγκος (kg)', pts.map(p => p.vol), '#66bb6a', 'y'));
+  const ax = (extra = {}) => ({ ticks: { color: '#8e8e93' }, grid: { color: '#26262a' }, ...extra });
+  chart = new Chart($('pg-c'), { type: 'line', data: { labels: pts.map(p => p.d), datasets: D },
+    options: { maintainAspectRatio: false, scales: { x: ax(), y: ax(), y1: ax({ display: m === 'both', position: 'right', grid: { drawOnChartArea: false } }) }, plugins: { legend: { labels: { color: '#f5f5f7' } } } } });
+}
+['pg-g', 'pg-e', 'pg-m'].forEach(i => $(i).onchange = renderProg);
+
+/* ---------- Γυμναστές ---------- */
+let CL = [];
+const rCl = () => { const q = $('cl-q').value.toLowerCase();
+  $('cl-list').innerHTML = CL.filter(c => ((c.name || '') + (c.email || '')).toLowerCase().includes(q)).map(c => `<button data-cl="${c.id}" data-n="${esc(c.name)}" class="w-full bg-[#1c1c1f] rounded-xl p-3 text-left"><b class="text-sm block">${esc(c.name || '—')}</b><span class="text-xs text-gray-500">${esc(c.email || '')}</span></button>`).join('') || '<p class="text-sm text-gray-500 text-center py-3">Κανένας πελάτης.</p>'; };
+$('h-clients').onclick = async () => {
+  try { CL = (await getDocs(collection(db, 'artifacts', APP, 'directory'))).docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'el')); }
+  catch { toast('Δεν έχεις πρόσβαση. Έλεγξε τους κανόνες Firestore.'); return; }
+  $('cl-q').value = ''; rCl(); openSheet('sheet-clients');
+};
+$('cl-q').oninput = rCl;
+async function viewClient(id, name) {
+  if (S.active) { toast('Τέλειωσε πρώτα την ανοιχτή προπόνηση'); return; }
+  viewing = id === user.uid ? null : id; await loadData();
+  const v = $('vbar'); v.classList.toggle('hidden', !viewing);
+  v.innerHTML = viewing ? `<span>Πελάτης: <b>${esc(name)}</b></span><button id="vb-x" class="font-bold underline">Επιστροφή</button>` : '';
+  refresh(); go('dash');
+}
+$('cl-list').onclick = e => { const b = e.target.closest('[data-cl]'); if (b) { closeSheet('sheet-clients'); viewClient(b.dataset.cl, b.dataset.n); } };
+$('vbar').onclick = e => { if (e.target.id === 'vb-x') viewClient(user.uid); };
+
+/* ---------- Οδηγίες χρήσης ---------- */
+const HELP = [
+  ['ph-barbell', 'Καλώς ήρθες στο Fit', 'Καταγράφεις προπονήσεις, βλέπεις πρόοδο και παρακολουθείς τις συνεδρίες του πακέτου σου. Πάτα Επόμενο για μια γρήγορη ξενάγηση.', ''],
+  ['ph-squares-four', 'Αρχική', 'Δείχνει πόσες συνεδρίες απομένουν (κύκλος), το βάρος σου, τον συνολικό όγκο και τις επόμενες προπονήσεις.', '⬇ Κουμπί «Αρχική» κάτω αριστερά'],
+  ['ph-calendar-check', 'Ημερολόγιο', 'Πάτα μια μέρα. Μπορείς να καταγράψεις προπόνηση που έκανες ή να προγραμματίσεις μελλοντική. Κόκκινη μέρα = έγινε, διακεκομμένη = προγραμματισμένη. Σύρε αριστερά/δεξιά για άλλους μήνες.', '⬆ Στην Αρχική, κάρτα «Δραστηριότητα»'],
+  ['ph-plus', 'Νέα προπόνηση', 'Πάτα το μεγάλο κόκκινο κουμπί. Διάλεξε κενή προπόνηση ή ρουτίνα.', '⬇ Κεντρικό κουμπί +, κάτω στη μέση'],
+  ['ph-check-square', 'Μέσα στην προπόνηση', 'Γράψε κιλά και επαναλήψεις και τσέκαρε ✓ το κάθε σετ. Το «Προηγ. φορά» σου δείχνει τι έκανες την τελευταία φορά. Με το ⋮⋮ μετακινείς ασκήσεις και με το σούπερ σετ τις ενώνεις. Στο τέλος πάτα «Τέλος» για αποθήκευση. Με το βελάκι ⌄ πάνω αριστερά ελαχιστοποιείς.', '⬆ Κουμπί «Τέλος» πάνω δεξιά'],
+  ['ph-timer', 'Διάλειμμα', 'Το στρογγυλό ρολόι κάτω δεξιά ξεκινά χρονόμετρο διαλείμματος (30s–3m) και χτυπά όταν τελειώσει.', '↘ Κάτω δεξιά μέσα στην προπόνηση'],
+  ['ph-clipboard-text', 'Ρουτίνες', 'Φτιάξε έτοιμα προγράμματα με το +. Με ▶ ξεκινάς, με ✎ επεξεργάζεσαι, με 🗑 διαγράφεις.', '⬇ «Ρουτίνες» κάτω'],
+  ['ph-chart-line-up', 'Πρόοδος', 'Γράφημα για κιλά και επαναλήψεις ανά μυϊκή ομάδα (Στήθος, Πλάτη, Πόδια…) ή ανά συγκεκριμένη άσκηση.', '⬇ «Πρόοδος» κάτω δεξιά'],
+  ['ph-clock-counter-clockwise', 'Ιστορικό', 'Όλες οι προπονήσεις ανά πακέτο. Πάτα μία για λεπτομέρειες ή διαγραφή. Πάτα την ανανέωση για να τη σβήσεις.', '⬇ «Ιστορικό» κάτω δεξιά'],
+  ['ph-user', 'Προφίλ & ασφάλεια', 'Αλλάζεις στοιχεία, συνεδρίες, PIN, εξαγωγή σε Excel και ειδοποίηση επιστροφής στην προπόνηση.', '↗ Ο κύκλος με το αρχικό πάνω δεξιά'],
+  ['ph-bell-ringing', 'Επιστροφή στην προπόνηση', 'Ενεργοποίησέ το από Προφίλ → Ειδοποίηση. Αν βγεις από την εφαρμογή στη μέση προπόνησης, θα δεις ειδοποίηση. Πάτα την για να γυρίσεις ακριβώς εκεί που ήσουν.', '']
+];
+let hp = 0;
+function showHelp() { const [i, t, d, a] = HELP[hp];
+  $('hp-i').innerHTML = `<i class="ph ${i}"></i>`; $('hp-t').textContent = t; $('hp-d').textContent = d; $('hp-a').textContent = a;
+  $('hp-n').textContent = `${hp + 1} / ${HELP.length}`; $('hp-b').style.visibility = hp ? 'visible' : 'hidden'; $('hp-nx').textContent = hp === HELP.length - 1 ? 'Τέλος' : 'Επόμενο'; }
+$('h-help').onclick = () => { hp = 0; showHelp(); openSheet('sheet-help'); };
+$('hp-b').onclick = () => { hp--; showHelp(); };
+$('hp-nx').onclick = () => { if (hp >= HELP.length - 1) closeSheet('sheet-help'); else { hp++; showHelp(); } };
+$('h-av').onclick = () => go('settings');
+
+/* ---------- Ειδοποίηση επιστροφής + ανάκτηση προπόνησης ---------- */
+const canN = () => 'Notification' in window && 'serviceWorker' in navigator;
+$('s-notif').onclick = async () => {
+  if (!canN()) { toast('Στο iPhone: Κοινοποίηση → Προσθήκη στην οθόνη αφετηρίας, και άνοιξέ την από εκεί'); return; }
+  const r = await Notification.requestPermission(); toast(r === 'granted' ? 'Οι ειδοποιήσεις ενεργοποιήθηκαν' : 'Μπλοκαρίστηκαν από τις ρυθμίσεις της συσκευής');
+};
+document.addEventListener('visibilitychange', () => {
+  if (!canN() || Notification.permission !== 'granted' || !SWR) return;
+  if (document.hidden) { if (S.active && !S.active.isRoutine) SWR.showNotification('Η προπόνησή σου τρέχει 💪', { body: 'Πάτα για να επιστρέψεις: ' + S.active.name, tag: 'wk', icon: 'icons/icon-192.png', requireInteraction: true }); }
+  else SWR.getNotifications({ tag: 'wk' }).then(l => l.forEach(n => n.close()));
+});
+async function checkDraft() {
+  const d = localStorage.getItem(draftKey()); if (!d || S.active || viewing) return;
+  const r = await ask('Ανοιχτή προπόνηση', 'Έχεις προπόνηση που δεν ολοκληρώθηκε.', [['Συνέχεια', 'r', 'pri'], ['Διαγραφή', 'd', 'dng']]);
+  if (r === 'r') { S.active = JSON.parse(d); beginUI(); } else localStorage.removeItem(draftKey());
+}
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').then(r => SWR = r).catch(() => {});
 setMode('login'); go('dash');
 </script>
 </body>
