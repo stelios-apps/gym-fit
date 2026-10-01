@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Fitness Elite Pro</title>
+<title>Fit</title>
 <meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Fitness Elite">
+<meta name="apple-mobile-web-app-title" content="Fit">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="manifest" href="manifest.webmanifest">
@@ -48,6 +48,8 @@ input,textarea{user-select:text}
 .sortable-ghost{opacity:.4}
 .nav-btn{color:#6b6b70;font-size:10px;font-weight:600}.nav-btn.on{color:#ef5350}
 .inp{font-size:16px}
+input[type=date]{-webkit-appearance:none;appearance:none;display:block;min-width:0;max-width:100%;width:100%;height:46px;text-align:left}
+#s-bio,#s-csv{display:none}
 </style>
 </head>
 <body class="flex flex-col">
@@ -57,7 +59,7 @@ input,textarea{user-select:text}
   <div class="max-w-md mx-auto space-y-6 pb-10">
     <div class="text-center">
       <div class="w-16 h-16 bg-brand rounded-2xl mx-auto flex items-center justify-center mb-4"><i class="ph-fill ph-barbell text-3xl"></i></div>
-      <h1 class="text-3xl font-extrabold tracking-tight">Fitness Elite</h1>
+      <h1 class="text-3xl font-extrabold tracking-tight">Fit</h1>
       <p class="text-gray-400 text-sm mt-1">Το προπονητικό σου ημερολόγιο</p>
     </div>
     <div class="card p-5 space-y-4">
@@ -242,7 +244,9 @@ input,textarea{user-select:text}
 <div id="sheet-day" class="sheet hidden fixed inset-0 z-[65] bg-black/80 flex items-end"><div class="panel card !rounded-b-none w-full p-5 pb-safe">
   <div class="flex justify-between items-center mb-3"><h2 class="text-lg font-bold capitalize" id="day-t"></h2><button data-close="sheet-day" class="w-8 h-8 rounded-full bg-[#1c1c1f] text-gray-400"><i class="ph ph-x"></i></button></div>
   <div id="day-list" class="space-y-2 mb-4"></div>
-  <input id="day-name" class="inp mb-3" placeholder="Όνομα (προαιρετικό), π.χ. Στήθος & Τρικέφαλα">
+  <input id="day-name" class="inp mb-3" placeholder="Όνομα (προαιρετικό)">
+<div class="grid grid-cols-2 gap-3 mb-3"><div><label class="lbl">Ρουτίνα (προαιρετικά)</label><select id="day-routine" class="inp"></select></div><div><label class="lbl">Ώρα (προαιρετικά)</label><input id="day-time" type="time" class="inp"></div></div>
+<label class="flex items-center gap-2 text-sm text-gray-300 mb-3"><input id="day-first" type="checkbox" class="set-checkbox" style="width:24px;height:24px"> Αυτή είναι η 1η προπόνηση νέου πακέτου</label>
   <div class="grid grid-cols-2 gap-3"><button id="day-done" class="btn pri !text-sm">Έκανα προπόνηση</button><button id="day-plan" class="btn !text-sm">Προγραμμάτισε</button></div>
 </div></div>
 
@@ -387,7 +391,7 @@ async function bioUnlock() {
 const dots = () => $('lk-dots').innerHTML = [0, 1, 2, 3].map(i => `<i class="w-3.5 h-3.5 rounded-full ${i < lk.buf.length ? 'bg-brand' : 'bg-[#2c2c30]'}"></i>`).join('');
 function showLock(mode) {
   lk = { mode, buf: '', first: '' };
-  const hasPin = !!localStorage.getItem(pinKey()), hasBio = !!localStorage.getItem(bioKey()), un = mode === 'unlock';
+  const hasPin = !!localStorage.getItem(pinKey()), hasBio = false, un = mode === 'unlock';
   $('lk-msg').textContent = !un ? 'Διάλεξε νέο PIN (4 ψηφία)' : hasPin ? 'Εισήγαγε PIN' : 'Η εφαρμογή είναι κλειδωμένη';
   $('lk-pad').classList.toggle('hidden', un && !hasPin); $('lk-dots').classList.toggle('hidden', un && !hasPin);
   $('lock-btn').classList.toggle('hidden', !un || !hasBio);
@@ -396,7 +400,7 @@ function showLock(mode) {
   if (un && hasBio) setTimeout(bioUnlock, 300);
 }
 function lockIfNeeded() {
-  if (user && !skipLock && (localStorage.getItem(bioKey()) || localStorage.getItem(pinKey()))) showLock('unlock');
+  if (user && !skipLock && localStorage.getItem(pinKey())) showLock('unlock');
   skipLock = false;
 }
 $('lk-pad').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'].map(k => k ? `<button data-k="${k}" class="btn !p-4 text-xl">${k}</button>` : '<div></div>').join('');
@@ -484,7 +488,7 @@ function renderDash() {
   while ((M[dk(c)] || []).some(i => i.t !== 'plan')) { streak++; c.setDate(c.getDate() - 1); }
   $('d-streak').textContent = `${streak} ${streak === 1 ? 'ημέρα' : 'ημέρες'} στη σειρά`;
   const up = S.cal.filter(x => x.kind === 'plan' && x.date >= td).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 3);
-  $('d-up').innerHTML = up.length ? up.map(x => `<button data-day="${x.date}" class="w-full flex justify-between items-center bg-[#1c1c1f] rounded-xl px-4 py-3 text-left"><span class="font-semibold text-sm">${esc(x.name)}</span><span class="text-xs text-brand-light">${new Date(x.date + 'T12:00').toLocaleDateString('el-GR', { weekday: 'short', day: 'numeric', month: 'short' })}</span></button>`).join('') : '<p class="text-sm text-gray-500">Δεν υπάρχει προγραμματισμένη προπόνηση. Πάτα μια μέρα στο ημερολόγιο.</p>';
+  $('d-up').innerHTML = up.length ? up.map(x => `<button data-day="${x.date}" class="w-full flex justify-between items-center bg-[#1c1c1f] rounded-xl px-4 py-3 text-left"><span class="font-semibold text-sm">${x.time ? x.time + ' · ' : ''}${esc(x.name)}</span><span class="text-xs text-brand-light">${new Date(x.date + 'T12:00').toLocaleDateString('el-GR', { weekday: 'short', day: 'numeric', month: 'short' })}</span></button>`).join('') : '<p class="text-sm text-gray-500">Δεν υπάρχει προγραμματισμένη προπόνηση. Πάτα μια μέρα στο ημερολόγιο.</p>';
 }
 $('cal').addEventListener('click', e => { if (e.target.closest('#cal-p')) { calOff++; renderDash(); } else if (e.target.closest('#cal-n')) { calOff--; renderDash(); } });
 document.addEventListener('click', e => { const b = e.target.closest('[data-day]'); if (b) openDay(b.dataset.day); });
@@ -494,19 +498,40 @@ function openDay(key) {
   $('day-t').textContent = new Date(key + 'T12:00').toLocaleDateString('el-GR', { weekday: 'long', day: 'numeric', month: 'long' });
   $('day-list').innerHTML = items.map(i => i.t === 'w'
     ? `<button data-w="${i.w.id}" class="w-full flex justify-between bg-[#1c1c1f] rounded-xl px-4 py-3 text-left"><b class="text-sm">${esc(i.w.name)}</b><span class="text-xs text-gray-400">${i.w.volume.toLocaleString('el-GR')} kg</span></button>`
-    : `<div class="flex justify-between items-center bg-[#1c1c1f] rounded-xl px-4 py-3"><span class="text-sm"><b>${esc(i.c.name)}</b> <span class="text-xs ${i.t === 'plan' ? 'text-brand-light' : 'text-gray-400'}">${i.t === 'plan' ? 'προγραμματισμένη' : 'έγινε'}</span></span><button data-del="${i.c.id}" class="text-gray-500 px-2"><i class="ph ph-trash"></i></button></div>`).join('');
-  $('day-name').value = ''; openSheet('sheet-day');
+    : `<div class="flex justify-between items-center bg-[#1c1c1f] rounded-xl px-4 py-3"><span class="text-sm"><b>${i.c.time ? i.c.time + ' · ' : ''}${esc(i.c.name)}</b> <span class="text-xs ${i.t === 'plan' ? 'text-brand-light' : 'text-gray-400'}">${i.t === 'plan' ? 'προγραμματισμένη' : 'έγινε'}</span></span><button data-del="${i.c.id}" class="text-gray-500 px-2"><i class="ph ph-trash"></i></button></div>`).join('');
+  $('day-name').value = ''; $('day-time').value = ''; $('day-first').checked = false;
+  $('day-routine').innerHTML = '<option value="">Χωρίς ρουτίνα</option>' + S.routines.map(r => `<option value="${r.id}">${esc(r.name)}</option>`).join('');
+  openSheet('sheet-day');
 }
 $('day-list').addEventListener('click', async e => {
   const w = e.target.closest('[data-w]'), d = e.target.closest('[data-del]');
   if (w) { closeSheet('sheet-day'); openDetail(S.workouts.find(x => x.id === w.dataset.w)); }
   if (d) { await deleteDoc(ref('calendar', d.dataset.del)); S.cal = S.cal.filter(x => x.id !== d.dataset.del); renderDash(); openDay(dayKey); }
 });
+function pkgInfo() {
+  const size = P().planSize || 12, m = {}; let k = 1, no = 0;
+  [...S.workouts].sort((a, b) => a.date - b.date).forEach(w => { if (w.pkgStart && no > 0) { k++; no = 0; } no++; if (no > size) { k++; no = 1; } m[w.id] = { k, no }; });
+  return m;
+}
+async function addPast() {
+  const rt = S.routines.find(r => r.id === $('day-routine').value), t = $('day-time').value;
+  const date = new Date(dayKey + 'T' + (t || '12:00')).getTime();
+  const exs = rt ? rt.exercises.map(e => ({ name: e.name || 'Χωρίς όνομα', ss: e.ss || '', sets: e.sets.map(s => ({ kg: parseFloat(String(s.kg).replace(',', '.')) || 0, reps: parseInt(s.reps) || 0 })) })) : [];
+  const vol = exs.reduce((a, e) => a + e.sets.reduce((b, s) => b + s.kg * s.reps, 0), 0);
+  const id = gid(), wk = { name: $('day-name').value.trim() || (rt ? rt.name : 'Προπόνηση'), date, duration: 0, volume: vol, exercises: exs, manual: true, pkgStart: $('day-first').checked, time: t || '' };
+  const sub = P().subscription - 1, tv = (P().totalVolume || 0) + vol;
+  try {
+    const b = writeBatch(db); b.set(ref('workouts', id), wk); b.set(profRef(), { subscription: sub, totalVolume: tv }, { merge: true }); await b.commit();
+    S.workouts.push({ id, ...wk }); S.workouts.sort((a, b) => b.date - a.date); P().subscription = sub; P().totalVolume = tv;
+    refresh(); openDay(dayKey); toast('Καταγράφηκε');
+  } catch { toast('Αποτυχία αποθήκευσης'); }
+}
+ 
 async function addCal(kind) {
-  const c = { date: dayKey, kind, name: $('day-name').value.trim() || (kind === 'plan' ? 'Προπόνηση' : 'Προπόνηση') }, id = gid();
+  const c = { date: dayKey, kind, time: $('day-time').value || '', name: $('day-name').value.trim() || (kind === 'plan' ? 'Προπόνηση' : 'Προπόνηση') }, id = gid();
   try { await setDoc(ref('calendar', id), c); S.cal.push({ id, ...c }); renderDash(); openDay(dayKey); toast(kind === 'plan' ? 'Προγραμματίστηκε' : 'Καταγράφηκε'); } catch { toast('Αποτυχία αποθήκευσης'); }
 }
-$('day-done').onclick = () => addCal('done'); $('day-plan').onclick = () => addCal('plan');
+$('day-done').onclick = addPast; $('day-plan').onclick = () => addCal('plan');
 
 function go(t) {
   document.querySelectorAll('.nav-btn').forEach(b => { const on = b.dataset.t === t; b.classList.toggle('on', on); const i = b.querySelector('i'); i.classList.toggle('ph-fill', on); i.classList.toggle('ph', !on); });
@@ -529,16 +554,16 @@ $('rt-list').addEventListener('click', async e => {
 $('rt-new').onclick = () => editRoutine(null);
 
 function renderHistory() {
-  const W = S.workouts, size = P().planSize || 12, tot = W.length; $('hi-n').textContent = tot;
+  const W = S.workouts, size = P().planSize || 12, tot = W.length, PK = pkgInfo(); $('hi-n').textContent = tot;
   const items = [...W.map((w, i) => ({ t: 'w', w, d: w.date, n: tot - i })), ...(S.renew || []).map(r => ({ t: 'r', r, d: r.date }))].sort((a, b) => b.d - a.d);
   let cur = '', pk = 0, out = '';
   items.forEach(it => {
     const m = new Date(it.d).toLocaleDateString('el-GR', { month: 'long', year: 'numeric' });
     if (m !== cur) { cur = m; out += `<h3 class="text-xs font-bold text-gray-500 uppercase mt-4 mb-1 pl-1">${m}</h3>`; }
     if (it.t === 'r') { out += `<div class="rounded-2xl p-3 flex items-center gap-3 border border-dashed border-brand-light bg-brand/10"><i class="ph-fill ph-credit-card text-2xl text-brand-light"></i><div><b class="text-sm">Ανανέωση πακέτου</b><span class="block text-xs text-gray-400">${new Date(it.d).toLocaleDateString('el-GR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} · +${it.r.n} συνεδρίες</span></div></div>`; return; }
-    const w = it.w, k = Math.floor((it.n - 1) / size) + 1, no = (it.n - 1) % size + 1;
+    const w = it.w, { k, no } = PK[w.id];
     if (k !== pk) { pk = k; out += `<div class="text-[11px] font-bold text-brand-light mt-3 pl-1">ΠΑΚΕΤΟ ${k}</div>`; }
-    out += `<button data-hw="${w.id}" class="card w-full p-4 flex justify-between items-center text-left"><div><div class="flex items-center gap-2"><b>${esc(w.name)}</b><span class="text-[10px] bg-brand/10 text-brand-light px-1.5 py-0.5 rounded font-bold">#${no}/${size}</span>${no === 1 ? '<span class="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-bold">ΑΡΧΗ ΠΑΚΕΤΟΥ</span>' : ''}</div><span class="text-xs text-gray-500">${new Date(w.date).toLocaleDateString('el-GR', { weekday: 'short', day: 'numeric', month: 'short' })} · ${(w.exercises || []).length} ασκήσεις</span></div><div class="text-right"><b class="text-lg">${w.volume.toLocaleString('el-GR')}</b><span class="block text-[10px] text-gray-500">${Math.round(w.duration / 60000)} λεπτά</span></div></button>`;
+    out += `<button data-hw="${w.id}" class="card w-full p-4 flex justify-between items-center text-left"><div><div class="flex items-center gap-2"><b>${esc(w.name)}</b><span class="text-[10px] bg-brand/10 text-brand-light px-1.5 py-0.5 rounded font-bold">#${no}/${size}</span>${no === 1 ? '<span class="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-bold">ΑΡΧΗ ΠΑΚΕΤΟΥ</span>' : ''}</div><span class="text-xs text-gray-500">${new Date(w.date).toLocaleDateString('el-GR', { weekday: 'short', day: 'numeric', month: 'short' })} ${w.time ? ' · ' + w.time : ''}· ${(w.exercises || []).length} ασκήσεις</span></div><div class="text-right"><b class="text-lg">${w.volume.toLocaleString('el-GR')}</b><span class="block text-[10px] text-gray-500">${w.duration ? Math.round(w.duration / 60000) + ' λεπτά' : 'καταχώρηση'}</span></div></button>`;
   });
   $('hi-list').innerHTML = tot ? out : '<p class="text-center text-gray-500 py-10">Δεν υπάρχει ιστορικό ακόμα.</p>';
 }
@@ -547,7 +572,7 @@ $('hi-list').addEventListener('click', e => { const b = e.target.closest('[data-
 function openDetail(w) {
   if (!w) return;
   $('de-t').textContent = w.name; $('de-d').textContent = new Date(w.date).toLocaleDateString('el-GR', { weekday: 'long', day: 'numeric', month: 'long' });
-  $('de-v').textContent = w.volume.toLocaleString('el-GR') + ' kg'; $('de-m').textContent = Math.round(w.duration / 60000) + ' λ'; { const n = S.workouts.length - S.workouts.indexOf(w), z = P().planSize || 12; $('de-n').textContent = '#' + ((n - 1) % z + 1) + '/' + z; };
+  $('de-v').textContent = w.volume.toLocaleString('el-GR') + ' kg'; $('de-m').textContent = (w.duration ? Math.round(w.duration / 60000) + ' λ' : '—'); { const q = pkgInfo()[w.id]; $('de-n').textContent = q ? '#' + q.no + '/' + (P().planSize || 12) : '-'; }
   $('de-ex').innerHTML = (w.exercises || []).map(ex => `<div class="bg-[#1c1c1f] rounded-2xl p-4"><div class="flex items-center gap-2 mb-2"><b class="text-sm">${esc(ex.name)}</b>${ex.ss ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded" style="background:${SSC[ex.ss]}33;color:${SSC[ex.ss]}">Σούπερ σετ ${ex.ss}</span>` : ''}</div>${ex.sets.map((s, i) => `<div class="flex justify-between text-sm py-1 border-b border-[#26262a] last:border-0"><span class="text-gray-500 text-xs">Σετ ${i + 1}</span><b>${s.kg} kg × ${s.reps}</b></div>`).join('')}</div>`).join('') || '<p class="text-gray-500 text-sm">Καταγράφηκε χωρίς ασκήσεις.</p>';
   $('de-del').onclick = async () => {
     const r = await ask('Διαγραφή προπόνησης', 'Να επιστραφεί και η συνεδρία στο πακέτο;', [['Διαγραφή & επιστροφή συνεδρίας', 'r', 'pri'], ['Διαγραφή μόνο', 'd'], ['Άκυρο', 'n']]);
@@ -665,7 +690,7 @@ function setRow(ex, s, i, R, h) {
   const p = h && h.sets[i], d = s.done && !R;
   return `<div class="set-row ${d ? 'opacity-40' : ''}" data-set="${s.id}">
     <div class="flex items-center gap-2"><button class="rm-set w-7 text-center text-gray-500 font-bold text-sm">${i + 1}</button>
-      <input type="number" inputmode="decimal" step="0.5" class="kg inp text-center font-semibold" placeholder="${p ? p.kg : '-'}" value="${s.kg}" ${d ? 'disabled' : ''}>
+      <input type="text" inputmode="decimal" class="kg inp text-center font-semibold" placeholder="${p ? p.kg : '-'}" value="${s.kg}" ${d ? 'disabled' : ''}>
       <input type="number" inputmode="numeric" class="reps inp text-center font-semibold" placeholder="${p ? p.reps : '-'}" value="${s.reps}" ${d ? 'disabled' : ''}>
       ${R ? '' : `<input type="checkbox" class="set-checkbox chk" ${d ? 'checked' : ''} ${(!s.kg || !s.reps) && !d ? 'disabled' : ''}>`}</div>
     ${R ? '' : `<div class="prev-line text-[11px] text-gray-500 pl-9 mt-1">${prevLine(p)}</div>`}</div>`;
@@ -675,7 +700,7 @@ const exOf = el => S.active.exercises.find(e => e.id === el.closest('.ex-card')?
 const setOf = (el, ex) => ex.sets.find(s => s.id === el.closest('.set-row')?.dataset.set);
 box.addEventListener('input', e => {
   const t = e.target; if (t.matches('.ex-name')) { exOf(t).name = t.value; draft(); return; } if (!t.matches('.kg,.reps')) return; const ex = exOf(t), s = setOf(t, ex);
-  s[t.classList.contains('kg') ? 'kg' : 'reps'] = t.value; const cb = t.closest('.set-row').querySelector('.chk'); if (cb) cb.disabled = !(s.kg && s.reps); draft();
+  if (t.classList.contains('kg')) t.value = t.value.replace(/,/g, '.').replace(/[^0-9.]/g, ''); s[t.classList.contains('kg') ? 'kg' : 'reps'] = t.value; const cb = t.closest('.set-row').querySelector('.chk'); if (cb) cb.disabled = !(s.kg && s.reps); draft();
 });
 box.addEventListener('change', e => {
   const t = e.target, ex = t.closest('.ex-card') && exOf(t); if (!ex) return;
