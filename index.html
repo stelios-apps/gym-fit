@@ -111,7 +111,8 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;displa
 .cel{animation:fadeIn .25s both;transition:opacity .5s}
 .cel-c{animation:spLogo .6s cubic-bezier(.16,1,.3,1) both,glow 1.4s ease-in-out infinite}
 .cel-t{animation:rise .6s .2s both}
-
+@keyframes flashRB{0%{background:#d32f2f}50%{background:#000}100%{background:#d32f2f}}
+.flash{position:fixed;inset:0;z-index:150;pointer-events:none;opacity:.9;animation:flashRB .5s linear 6}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 </style>
 </head>
@@ -303,6 +304,11 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;displa
        <p class="text-xs text-gray-500">Διαγράφει οριστικά όλα τα δεδομένα αυτού του πελάτη και τον αποκλείει από την εφαρμογή.</p>
        <button id="s-delacc" class="btn dng">Διαγραφή λογαριασμού πελάτη</button>
       </div>
+      <div id="s-logwrap" class="hidden card p-5 space-y-3">
+       <h3 class="font-semibold">Αναφορά συνδρομών</h3>
+       <p class="text-[11px] text-gray-500">Κάθε αλλαγή στις συνεδρίες, με ώρα και ποιος την έκανε.</p>
+       <div id="s-log" class="space-y-2"></div>
+      </div>
       <p class="text-center text-[11px] text-gray-600 pt-2 pb-4 leading-relaxed">Fit · Designed and developed by Stelios Andritsakis<br>© 2026 All rights reserved</p>
     </section>
   </main>
@@ -381,10 +387,11 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;displa
   <h3 class="text-lg font-bold mb-1" id="dlg-t"></h3><p class="text-sm text-gray-400 mb-4" id="dlg-m"></p><div id="dlg-b" class="space-y-2"></div>
 </div></div>
 <div id="rest-full" class="hidden fixed inset-0 z-[115] flex flex-col items-center justify-center text-white" style="background:linear-gradient(#d32f2f,#6d0f0f);opacity:0;transform:translate(38%,42%) scale(.1);transform-origin:bottom right;transition:opacity .35s,transform .4s">
+  <button id="rf-min" class="absolute left-4 flex items-center gap-1 px-4 py-2 rounded-full text-sm font-bold" style="top:calc(16px + var(--st));background:#0006"><i class="ph ph-arrows-in-simple text-lg"></i>Σμίκρυνση</button>
   <p class="font-bold tracking-widest text-sm text-white/80">ΔΙΑΛΕΙΜΜΑ</p>
   <div id="rf-t" class="font-extrabold leading-none my-8" style="font-size:96px;font-variant-numeric:tabular-nums">00:00</div>
   <div class="flex gap-3"><button id="rf-m" class="btn !w-auto !px-6" style="background:#0005">−15″</button><button id="rf-p" class="btn !w-auto !px-6" style="background:#0005">+15″</button></div>
-  <button id="rf-min" class="mt-10 text-white/80 text-sm">Μείωση</button>
+
   <button id="rf-skip" class="mt-4 text-white font-bold underline">Παράλειψη</button>
 </div>
 <div id="toast" class="fixed left-1/2 -translate-x-1/2 z-[120] card px-5 py-3 text-sm font-medium opacity-0 pointer-events-none transition-all" style="top:calc(20px + var(--st));transform:translate(-50%,-20px)"></div>
@@ -426,6 +433,14 @@ const writeBatch = d => { const b = fsBatch(d); return { set: (...a) => b.set(..
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const gid = () => Math.random().toString(36).slice(2, 12);
+
+// επαναλήψεις για ένα-ένα άκρο: reps = Αριστερά, reps2 = Δεξιά
+const has2 = s => s.reps2 !== undefined && s.reps2 !== null && s.reps2 !== '';
+const rp = s => has2(s) ? Math.min(+s.reps || 0, +s.reps2 || 0) : (+s.reps || 0); // αδύναμη πλευρά
+const tr = s => (+s.reps || 0) + (has2(s) ? (+s.reps2 || 0) : 0);                   // σύνολο
+const rtxt = s => has2(s) ? `${s.reps}/${s.reps2}` : `${s.reps}`;
+
+
 const pad = n => String(n).padStart(2, '0');
 const dk = d => { const x = new Date(d); return `${x.getFullYear()}-${pad(x.getMonth()+1)}-${pad(x.getDate())}`; };
 const fd = t => new Date(t).toLocaleDateString('el-GR', { day: 'numeric', month: 'short' });
@@ -537,17 +552,18 @@ onAuthStateChanged(auth, async u => {
 
 const DEF = { name: 'Athlete', dob: '', height: 0, weight: 0, subscription: 12, planSize: 12, totalVolume: 0 };
 async function loadData() {
-  S.profile = { ...DEF }; S.workouts = []; S.routines = []; S.cal = []; S.renew = [];
+  S.profile = { ...DEF }; S.workouts = []; S.routines = []; S.cal = []; S.renew = []; S.subLog = [];
   try {
     const ps = await getDoc(profRef()); if (ps.exists()) S.profile = { ...DEF, ...ps.data() };
     if (!P().planSize) P().planSize = 12;
     const rd = async n => (await getDocs(col(n))).docs.map(d => ({ id: d.id, ...d.data() }));
     S.workouts = (await rd('workouts')).sort((a, b) => b.date - a.date);
     S.routines = (await rd('routines')).sort((a, b) => (a.order || 0) - (b.order || 0));
-    S.cal = await rd('calendar'); S.renew = await rd('renewals');
+    S.cal = await rd('calendar'); S.renew = await rd('renewals'); S.subLog = await rd('subLog');
   } catch (err) { console.error(err); toast('Σφάλμα φόρτωσης δεδομένων'); }
 }
-const dirSave = () => setDoc(doc(db, 'artifacts', APP, 'directory', tuid()), { name: P().name, ...(viewing ? {} : { email: user.email || '' }) }, { merge: true }).catch(() => {});
+const dirSave = () => setDoc(doc(db, 'artifacts', APP, 'directory', tuid()), { name: P().name, subs: P().subscription, plan: P().planSize || 12, ...(viewing ? {} : { email: user.email || '' }) }, { merge: true }).catch(() => {});
+let lastDirSubs = null;
 async function boot(u) {
   user = u; viewing = null;
   if (!isTr()) {
@@ -655,6 +671,8 @@ function refresh() {
   renderDash(); renderRoutines(); renderHistory(); fillSettings(); renderBio();
   if (!$('v-prog').classList.contains('hidden')) renderProg();
   renderCta();
+  renderSubLog();
+  if (P().subscription !== lastDirSubs) { lastDirSubs = P().subscription; dirSave(); }
   $('fab-i').className = S.active ? 'ph-fill ph-play text-2xl' : 'ph ph-plus text-3xl';
 }
 function dayMap() {
@@ -714,12 +732,11 @@ function pkgInfo() {
 async function addPast() {
   const rt = S.routines.find(r => r.id === $('day-routine').value), t = $('day-time').value;
   const date = new Date(dayKey + 'T' + (t || '12:00')).getTime();
-  const exs = rt ? rt.exercises.map(e => ({ name: e.name || 'Χωρίς όνομα', ss: e.ss || '', sets: e.sets.map(s => ({ kg: parseFloat(String(s.kg).replace(',', '.')) || 0, reps: parseInt(s.reps) || 0 })) })) : [];
-  const vol = exs.reduce((a, e) => a + e.sets.reduce((b, s) => b + s.kg * s.reps, 0), 0);
-  const id = gid(), wk = { name: $('day-name').value.trim() || (rt ? rt.name : 'Προπόνηση'), date, duration: 0, volume: vol, exercises: exs, manual: true, pkgStart: $('day-first').checked, time: t || '' };
+  const exs = rt ? rt.exercises.map(e => ({ name: e.name || 'Χωρίς όνομα', ss: e.ss || '', uni: !!e.uni, sets: e.sets.map(s => ({ kg: parseFloat(String(s.kg).replace(',', '.')) || 0, reps: parseInt(s.reps) || 0, ...(e.uni ? { reps2: parseInt(s.reps2) || 0 } : {}) })) })) : [];
+  const vol = exs.reduce((a, e) => a + e.sets.reduce((b, s) => b + s.kg * tr(s), 0), 0);  const id = gid(), wk = { name: $('day-name').value.trim() || (rt ? rt.name : 'Προπόνηση'), date, duration: 0, volume: vol, exercises: exs, manual: true, pkgStart: $('day-first').checked, time: t || '' };
   const sub = P().subscription - 1, tv = (P().totalVolume || 0) + vol;
   try {
-    const b = writeBatch(db); b.set(ref('workouts', id), wk); b.set(profRef(), { subscription: sub, totalVolume: tv }, { merge: true }); await b.commit();
+    const b = writeBatch(db); b.set(ref('workouts', id), wk); b.set(profRef(), { subscription: sub, totalVolume: tv }, { merge: true }); await b.commit(); logSub('manual_workout', sub + 1, sub);
     S.workouts.push({ id, ...wk }); S.workouts.sort((a, b) => b.date - a.date); P().subscription = sub; P().totalVolume = tv;
     refresh(); openDay(dayKey); toast('Καταγράφηκε');
   } catch { toast('Αποτυχία αποθήκευσης'); }
@@ -779,7 +796,7 @@ function openDetail(w) {
   if (!w) return;
   $('de-t').textContent = w.name; $('de-d').textContent = new Date(w.date).toLocaleDateString('el-GR', { weekday: 'long', day: 'numeric', month: 'long' });
   $('de-v').textContent = w.volume.toLocaleString('el-GR') + ' kg'; $('de-m').textContent = (w.duration ? Math.round(w.duration / 60000) + ' λ' : '—'); { const q = pkgInfo()[w.id]; $('de-n').textContent = q ? '#' + q.no + '/' + (P().planSize || 12) : '-'; }
-  $('de-ex').innerHTML = (w.exercises || []).map(ex => `<div class="bg-[#1c1c1f] rounded-2xl p-4"><div class="flex items-center gap-2 mb-2"><b class="text-sm">${esc(ex.name)}</b>${ex.ss ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded" style="background:${SSC[ex.ss]}33;color:${SSC[ex.ss]}">Σούπερ σετ ${ex.ss}</span>` : ''}</div>${ex.sets.map((s, i) => `<div class="flex justify-between text-sm py-1 border-b border-[#26262a] last:border-0"><span class="text-gray-500 text-xs">Σετ ${i + 1}</span><b>${s.kg} kg × ${s.reps}</b></div>`).join('')}</div>`).join('') || '<p class="text-gray-500 text-sm">Καταγράφηκε χωρίς ασκήσεις.</p>';
+  $('de-ex').innerHTML = (w.exercises || []).map(ex => `<div class="bg-[#1c1c1f] rounded-2xl p-4"><div class="flex items-center gap-2 mb-2"><b class="text-sm">${esc(ex.name)}</b>${ex.ss ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded" style="background:${SSC[ex.ss]}33;color:${SSC[ex.ss]}">Σούπερ σετ ${ex.ss}</span>` : ''}</div>${ex.sets.map((s, i) => `<div class="flex justify-between text-sm py-1 border-b border-[#26262a] last:border-0"><span class="text-gray-500 text-xs">Σετ ${i + 1}</span><b>${s.kg} kg × ${rtxt(s)}</b></div>`).join('')}</div>`).join('') || '<p class="text-gray-500 text-sm">Καταγράφηκε χωρίς ασκήσεις.</p>';
   $('de-note').value = w.note || '';
   $('de-note-save').onclick = async () => {
     const t = $('de-note').value.trim();
@@ -790,11 +807,26 @@ function openDetail(w) {
     if (r === 'n' || !r) return;
     try {
       await deleteDoc(ref('workouts', w.id)); S.workouts = S.workouts.filter(x => x.id !== w.id);
-      P().totalVolume = Math.max(0, (P().totalVolume || 0) - (w.volume || 0)); if (r === 'r') P().subscription++;
+      P().totalVolume = Math.max(0, (P().totalVolume || 0) - (w.volume || 0)); if (r === 'r') { logSub('refund', P().subscription, P().subscription + 1); P().subscription++; }
       await saveProfile(); closeSheet('sheet-detail'); refresh(); toast('Διαγράφηκε');
     } catch { toast('Αποτυχία διαγραφής'); }
   };
   openSheet('sheet-detail');
+}
+
+
+async function logSub(type, before, after, note = '') {
+  const rec = { date: Date.now(), type, before, after, byTr: isTr(), by: user.email || '', note }, id = gid();
+  try { await setDoc(ref('subLog', id), rec); (S.subLog ||= []).push({ id, ...rec }); } catch { }
+}
+const LOGT = { workout: ['Προπόνηση', 'ph-barbell'], manual_workout: ['Καταχώρηση από ημερολόγιο', 'ph-calendar-check'], refund: ['Επιστροφή συνεδρίας', 'ph-arrow-u-up-left'], renew: ['Ανανέωση πακέτου', 'ph-credit-card'], manual: ['Χειροκίνητη αλλαγή', 'ph-warning'] };
+function renderSubLog() {
+  const show = isTr() && !!viewing; $('s-logwrap').classList.toggle('hidden', !show); if (!show) return;
+  const L = [...(S.subLog || [])].sort((a, b) => b.date - a.date);
+  $('s-log').innerHTML = L.map(l => {
+    const [t, i] = LOGT[l.type] || [l.type, 'ph-dot'], d = l.after - l.before, w = l.type === 'manual';
+    return `<div class="rounded-xl p-3 ${w ? 'bg-red-500/10 border border-red-500/40' : 'bg-[#1c1c1f]'}"><div class="flex justify-between items-center"><b class="text-sm"><i class="ph ${i} ${w ? 'text-red-400' : 'text-brand-light'}"></i> ${t}</b><b class="${d > 0 ? 'text-green-400' : d < 0 ? 'text-red-400' : 'text-gray-400'}">${d > 0 ? '+' : ''}${d}</b></div><div class="text-[11px] text-gray-500 mt-1">${new Date(l.date).toLocaleString('el-GR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · ${l.before} → ${l.after} · ${l.byTr ? 'από γυμναστή' : 'από πελάτη'}</div></div>`;
+  }).join('') || '<p class="text-sm text-gray-500">Καμία καταγραφή ακόμα (καταγράφονται από τώρα και πέρα).</p>';
 }
 
 /* ---------- Settings ---------- */
@@ -805,20 +837,20 @@ function fillSettings() {
 $('s-minus').onclick = () => $('s-subs').value = (parseInt($('s-subs').value) || 0) - 1;
 $('s-plus').onclick = () => $('s-subs').value = (parseInt($('s-subs').value) || 0) + 1;
 $('s-save').onclick = async () => {
-  const p = P(); p.name = $('s-name').value.trim() || 'Athlete'; p.weight = parseFloat($('s-w').value) || 0; p.height = parseInt($('s-h').value) || 0; p.dob = $('s-dob').value;
+  const p = P(), before = p.subscription; p.name = $('s-name').value.trim() || 'Athlete'; p.weight = parseFloat($('s-w').value) || 0; p.height = parseInt($('s-h').value) || 0; p.dob = $('s-dob').value;
   p.subscription = parseInt($('s-subs').value) || 0; p.planSize = parseInt($('s-plan').value) || 12;
-  try { await saveProfile(); dirSave(); refresh(); toast('Αποθηκεύτηκε'); } catch { toast('Αποτυχία αποθήκευσης'); }
+  try { await saveProfile(); if (p.subscription !== before) logSub('manual', before, p.subscription); dirSave(); refresh(); toast('Αποθηκεύτηκε'); } catch { toast('Αποτυχία αποθήκευσης'); }
 };
 async function renew() {
   const p = P(), n = p.planSize || 12, cur = p.subscription, nw = cur + n;
   const r = await ask('Ανανέωση πακέτου', `${cur < 0 ? `Χρωστάς ${-cur} συνεδρίες, θα αφαιρεθούν από το νέο πακέτο.<br>` : ''}Προστίθενται ${n} συνεδρίες.<br><b class="text-white">Νέο υπόλοιπο: ${nw}</b>`, [['Ανανέωση', 'y', 'pri'], ['Άκυρο', 'n']]);
   if (r !== 'y') return false;
-  try { p.subscription = nw; await saveProfile(); const rid = gid(), rec = { date: Date.now(), n }; await setDoc(ref('renewals', rid), rec); (S.renew ||= []).push({ id: rid, ...rec }); refresh(); toast('Το πακέτο ανανεώθηκε'); return true; } catch { p.subscription = cur; toast('Αποτυχία ανανέωσης'); return false; }
+  try { p.subscription = nw; await saveProfile(); const rid = gid(), rec = { date: Date.now(), n }; await setDoc(ref('renewals', rid), rec); (S.renew ||= []).push({ id: rid, ...rec }); refresh(); toast('Το πακέτο ανανεώθηκε'); logSub('renew', cur, nw); return true; } catch { p.subscription = cur; toast('Αποτυχία ανανέωσης'); return false; }
 }
 $('d-renew').onclick = renew; $('s-renew').onclick = renew;
 $('s-csv').onclick = () => {
   const rows = [['Ημερομηνία', 'Προπόνηση', 'Άσκηση', 'Σετ', 'Κιλά', 'Επαναλήψεις', 'Όγκος']];
-  [...S.workouts].reverse().forEach(w => (w.exercises || []).forEach(e => e.sets.forEach((s, i) => rows.push([dk(w.date), w.name, e.name, i + 1, s.kg, s.reps, s.kg * s.reps]))));
+  [...S.workouts].reverse().forEach(w => (w.exercises || []).forEach(e => e.sets.forEach((s, i) => rows.push([dk(w.date), w.name, e.name, i + 1, s.kg, rtxt(s), s.kg * tr(s)]))));
   const csv = '\ufeff' + rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); a.download = 'fitness-elite.csv'; a.click();
 };
@@ -853,7 +885,7 @@ $('st-empty').onclick = () => { closeSheet('sheet-start'); beginWorkout(null); }
 const newEx = () => ({ id: gid(), name: '', ss: '', sets: [{ id: gid(), kg: '', reps: '', done: false }] });
 function beginWorkout(rid) {
   const rt = rid && S.routines.find(r => r.id === rid);
-  S.active = { isRoutine: false, id: gid(), name: rt ? rt.name : 'Προπόνηση', startTime: Date.now(), exercises: rt ? rt.exercises.map(e => ({ id: gid(), name: e.name, ss: e.ss || '', sets: e.sets.map(s => ({ id: gid(), kg: s.kg, reps: s.reps, done: false })) })) : [] };
+  S.active = { isRoutine: false, id: gid(), name: rt ? rt.name : 'Προπόνηση', startTime: Date.now(), exercises: rt ? rt.exercises.map(e => ({ id: gid(), name: e.name, ss: e.ss || '', uni: !!e.uni, sets: e.sets.map(s => ({ id: gid(), kg: s.kg, reps: s.reps, reps2: s.reps2 ?? '', done: false })) })) : [] };
   beginUI();
 }
 function beginUI() {
@@ -880,7 +912,7 @@ setInterval(() => { const a = S.active; if (!a || a.isRoutine || !a.startTime) r
 /* ---------- Editor ---------- */
 const SSC = { A: '#ef5350', B: '#42a5f5', C: '#66bb6a', D: '#ffa726' };
 const prevOf = ex => { const k = (ex.name || '').trim().toLowerCase(); return k && hist[k]; };
-const lastTxt = h => h ? `Τελευταία φορά ${fd(h.date)}: ${h.sets.map(s => `${s.kg}kg×${s.reps}`).join(' · ')} <button class="copy-prev text-brand-light font-bold">↺ Αντιγραφή</button>` : '';
+const lastTxt = h => h ? `Τελευταία φορά ${fd(h.date)}: ${h.sets.map(s => `${s.kg}kg×${rtxt(s)}`).join(' · ')} <button class="copy-prev text-brand-light font-bold">↺ Αντιγραφή</button>` : '';
 function renderEditor() {
   const a = S.active, R = a.isRoutine, box = $('wk-ex');
   if (!a.exercises.length) { box.innerHTML = '<div class="h-40 flex flex-col items-center justify-center text-gray-600"><i class="ph ph-barbell text-5xl mb-2"></i><p>Πρόσθεσε μια άσκηση για να ξεκινήσεις</p></div>' + (R ? '' : '<button class="cancel-wk w-full text-center text-sm text-red-500 py-4">Ακύρωση προπόνησης</button>'); return; }
@@ -889,31 +921,35 @@ function renderEditor() {
     return `<div class="ex-card card p-3" data-id="${ex.id}" style="${c ? `border-left:4px solid ${c}` : ''}">
       <div class="flex items-center gap-2"><div class="drag-handle p-2 -ml-1 text-gray-600 touch-none"><i class="ph ph-dots-six-vertical text-xl"></i></div>
         <div class="flex-1 min-w-0"><input list="ex-list" class="ex-name bg-transparent text-lg font-bold w-full outline-none" placeholder="Όνομα άσκησης" value="${esc(ex.name)}"><div class="last text-[11px] text-gray-500">${lastTxt(h)}</div></div>
+        <button class="uni-tg h-9 px-3 rounded-full text-xs font-bold ${ex.uni ? 'bg-brand text-white' : 'bg-[#1c1c1f] text-gray-400'}">Α/Δ</button>
         <button class="rm-ex w-9 h-9 rounded-full bg-red-500/10 text-red-500"><i class="ph ph-trash"></i></button></div>
       <div class="grid gap-2 mt-2 mb-3" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
         <select class="grp-sel bg-[#1c1c1f] border border-[#2c2c30] rounded-lg text-xs px-2 py-1.5 outline-none text-gray-300">${GRN.map(k => `<option value="${k}" ${grpOf(ex.name) === k ? 'selected' : ''}>${k}</option>`).join('')}</select>
         <select class="ss-sel bg-[#1c1c1f] border border-[#2c2c30] rounded-lg text-xs px-2 py-1.5 outline-none" style="color:${c || '#9a9aa0'}"><option value="">Χωρίς σούπερ σετ</option>${Object.keys(SSC).map(k => `<option value="${k}" ${ex.ss === k ? 'selected' : ''}>Σούπερ σετ ${k}</option>`).join('')}</select></div>
-      <div class="flex gap-2 px-1 mb-1 text-[10px] text-gray-500 font-bold text-center"><span class="w-7">ΣΕΤ</span><span class="flex-1">ΚΙΛΑ</span><span class="flex-1">ΕΠΑΝΑΛΗΨΕΙΣ</span>${R ? '' : '<span class="w-8"></span>'}</div>
+      <div class="flex gap-2 px-1 mb-1 text-[10px] text-gray-500 font-bold text-center"><span class="w-7">ΣΕΤ</span><span class="flex-1">ΚΙΛΑ</span>${ex.uni ? '<span class="flex-1">ΑΡΙΣΤ.</span><span class="flex-1">ΔΕΞΙΑ</span>' : '<span class="flex-1">ΕΠΑΝΑΛΗΨΕΙΣ</span>'}${R ? '' : '<span class="w-8"></span>'}</div>
       <div class="space-y-2">${ex.sets.map((s, i) => setRow(ex, s, i, R, h)).join('')}</div>
       <button class="add-set w-full mt-3 py-2.5 bg-[#1c1c1f] rounded-xl text-brand-light text-xs font-bold">+ Προσθήκη σετ</button></div>`;
   }).join('') + (R ? '' : '<button class="cancel-wk w-full text-center text-sm text-red-500 py-4">Ακύρωση προπόνησης</button>');
 }
-const prevLine = p => p ? `Προηγ. φορά: <b class="text-gray-300">${p.kg} kg × ${p.reps} επαν.</b>` : 'Προηγ. φορά: —';
+const prevLine = p => p ? `Προηγ. φορά: <b class="text-gray-300">${p.kg} kg × ${rtxt(p)} επαν.</b>` : 'Προηγ. φορά: —';
 function setRow(ex, s, i, R, h) {
-  const p = h && h.sets[i], d = s.done && !R;
+  const p = h && h.sets[i], d = s.done && !R, u = ex.uni, ok = s.kg && s.reps && (!u || s.reps2);
   return `<div class="set-row ${d ? 'opacity-40' : ''}" data-set="${s.id}">
     <div class="flex items-center gap-2"><button class="rm-set w-7 text-center text-gray-500 font-bold text-sm">${i + 1}</button>
       <input type="text" inputmode="decimal" class="kg inp text-center font-semibold" placeholder="${p ? p.kg : '-'}" value="${s.kg}" ${d ? 'disabled' : ''}>
       <input type="number" inputmode="numeric" class="reps inp text-center font-semibold" placeholder="${p ? p.reps : '-'}" value="${s.reps}" ${d ? 'disabled' : ''}>
-      ${R ? '' : `<input type="checkbox" class="set-checkbox chk" ${d ? 'checked' : ''} ${(!s.kg || !s.reps) && !d ? 'disabled' : ''}>`}</div>
+      ${u ? `<input type="number" inputmode="numeric" class="reps2 inp text-center font-semibold" placeholder="${p && p.reps2 != null ? p.reps2 : '-'}" value="${s.reps2 ?? ''}" ${d ? 'disabled' : ''}>` : ''}
+      ${R ? '' : `<input type="checkbox" class="set-checkbox chk" ${d ? 'checked' : ''} ${!ok && !d ? 'disabled' : ''}>`}</div>
     ${R ? '' : `<div class="prev-line text-[11px] text-gray-500 pl-9 mt-1">${prevLine(p)}</div>`}</div>`;
 }
 const box = $('wk-ex');
 const exOf = el => S.active.exercises.find(e => e.id === el.closest('.ex-card')?.dataset.id);
 const setOf = (el, ex) => ex.sets.find(s => s.id === el.closest('.set-row')?.dataset.set);
 box.addEventListener('input', e => {
-  const t = e.target; if (t.matches('.ex-name')) { exOf(t).name = t.value; draft(); return; } if (!t.matches('.kg,.reps')) return; const ex = exOf(t), s = setOf(t, ex);
-  if (t.classList.contains('kg')) t.value = t.value.replace(/,/g, '.').replace(/[^0-9.]/g, ''); s[t.classList.contains('kg') ? 'kg' : 'reps'] = t.value; const cb = t.closest('.set-row').querySelector('.chk'); if (cb) cb.disabled = !(s.kg && s.reps); draft();
+  const t = e.target; if (t.matches('.ex-name')) { exOf(t).name = t.value; draft(); return; } if (!t.matches('.kg,.reps,.reps2')) return; const ex = exOf(t), s = setOf(t, ex);
+  if (t.classList.contains('kg')) t.value = t.value.replace(/,/g, '.').replace(/[^0-9.]/g, '');
+  s[t.classList.contains('kg') ? 'kg' : t.classList.contains('reps2') ? 'reps2' : 'reps'] = t.value;
+  const cb = t.closest('.set-row').querySelector('.chk'); if (cb) cb.disabled = !(s.kg && s.reps && (!ex.uni || s.reps2)); draft();
 });
 box.addEventListener('change', e => {
   const t = e.target, ex = t.closest('.ex-card') && exOf(t); if (!ex) return;
@@ -928,7 +964,7 @@ box.addEventListener('change', e => {
     setGrp(ex.name, t.value);
   } else if (t.matches('.chk')) {
     const s = setOf(t, ex), row = t.closest('.set-row'); s.done = t.checked;
-    row.classList.toggle('opacity-40', s.done); row.querySelectorAll('.kg,.reps').forEach(i => i.disabled = s.done); navigator.vibrate?.(15);
+    row.classList.toggle('opacity-40', s.done); row.querySelectorAll('.kg,.reps,.reps2').forEach(i => i.disabled = s.done); navigator.vibrate?.(15);
   }
   draft();
 });
@@ -936,10 +972,11 @@ box.addEventListener('click', async e => {
   const b = e.target.closest('button'); if (!b) return; const a = S.active;
   if (b.classList.contains('cancel-wk')) { const r = await ask('Ακύρωση προπόνησης', 'Τα δεδομένα αυτής της προπόνησης θα χαθούν.', [['Ακύρωση προπόνησης', 'y', 'dng'], ['Συνέχεια', 'n']]); if (r === 'y') closeOverlay(true); return; }
   const ex = exOf(b); if (!ex) return;
+  if (b.classList.contains('uni-tg')) { ex.uni = !ex.uni; ex.sets.forEach(s => s.reps2 = ''); renderEditor(); draft(); return; }
   if (b.classList.contains('rm-ex')) { a.exercises = a.exercises.filter(x => x !== ex); renderEditor(); }
-  else if (b.classList.contains('add-set')) { const l = ex.sets[ex.sets.length - 1]; ex.sets.push({ id: gid(), kg: l?.kg ?? '', reps: l?.reps ?? '', done: false }); renderEditor(); }
+  else if (b.classList.contains('add-set')) { const l = ex.sets[ex.sets.length - 1]; ex.sets.push({ id: gid(), kg: l?.kg ?? '', reps: l?.reps ?? '', reps2: l?.reps2 ?? '', done: false }); renderEditor(); }
   else if (b.classList.contains('rm-set')) { if (ex.sets.length > 1) { ex.sets = ex.sets.filter(s => s.id !== b.closest('.set-row').dataset.set); renderEditor(); } else toast('Χρειάζεται τουλάχιστον ένα σετ'); }
-  else if (b.classList.contains('copy-prev')) { const h = prevOf(ex); if (!h) return; h.sets.forEach((p, i) => { if (!ex.sets[i]) ex.sets.push({ id: gid(), kg: '', reps: '', done: false }); if (!ex.sets[i].done) { ex.sets[i].kg = p.kg; ex.sets[i].reps = p.reps; } }); renderEditor(); }
+  else if (b.classList.contains('copy-prev')) { const h = prevOf(ex); if (!h) return; h.sets.forEach((p, i) => { if (!ex.sets[i]) ex.sets.push({ id: gid(), kg: '', reps: '', done: false }); if (!ex.sets[i].done) { ex.sets[i].kg = p.kg; ex.sets[i].reps = p.reps; if (ex.uni) ex.sets[i].reps2 = p.reps2 ?? ''; } }); renderEditor(); }
   else if (b.classList.contains('fill-prev')) {
     const s = setOf(b, ex), h = prevOf(ex), p = h && h.sets[ex.sets.indexOf(s)]; if (!p || s.done) return;
     s.kg = p.kg; s.reps = p.reps; const row = b.closest('.set-row'); row.querySelector('.kg').value = s.kg; row.querySelector('.reps').value = s.reps; row.querySelector('.chk').disabled = false;
@@ -961,18 +998,27 @@ const fullRest = on => {
   if (on) { RF.classList.remove('hidden'); requestAnimationFrame(() => requestAnimationFrame(() => { RF.style.opacity = 1; RF.style.transform = 'none'; })); }
   else { RF.style.opacity = 0; RF.style.transform = 'translate(38%,42%) scale(.1)'; setTimeout(() => { if (RF.style.opacity == 0) RF.classList.add('hidden'); }, 400); }
 };
-function beep() { try { const o = AC.createOscillator(), g = AC.createGain(); o.connect(g); g.connect(AC.destination); o.frequency.value = 880; g.gain.value = .35; o.start(); o.stop(AC.currentTime + .6); } catch { } }
+let lastSec = -1, wl = null, endTO;
+function beep(f = 880, d = .6) { try { const o = AC.createOscillator(), g = AC.createGain(); o.connect(g); g.connect(AC.destination); o.frequency.value = f; g.gain.value = .35; o.start(); o.stop(AC.currentTime + d); } catch { } }
+function flash() { const f = document.createElement('div'); f.className = 'flash'; document.body.appendChild(f); setTimeout(() => f.remove(), 3200); }
+async function wake(on) { try { if (on) wl = await navigator.wakeLock?.request('screen'); else { await wl?.release(); wl = null; } } catch { } }
 function stopRest(done) {
-  clearInterval(restInt); restEnd = 0; fullRest(false); RO.innerHTML = '<i class="ph ph-timer text-xl"></i>';
-  if (done) { beep(); navigator.vibrate?.([300, 120, 300, 120, 300]); RO.classList.add('animate-pulse'); setTimeout(() => RO.classList.remove('animate-pulse'), 5000); }
+  clearInterval(restInt); clearTimeout(endTO); restEnd = 0; lastSec = -1; fullRest(false); wake(false); RO.innerHTML = '<i class="ph ph-timer text-xl"></i>';
+  if (done) {
+    beep(); navigator.vibrate?.([400, 150, 400, 150, 400]); flash(); RO.classList.add('animate-pulse'); setTimeout(() => RO.classList.remove('animate-pulse'), 5000);
+    if (document.hidden && SWR && 'Notification' in window && Notification.permission === 'granted') SWR.showNotification('Τέλος διαλείμματος 💪', { body: 'Ώρα για το επόμενο σετ', tag: 'rest', icon: 'icons/icon-192.png', requireInteraction: true, vibrate: [300, 100, 300] });
+  }
 }
-function tick() { const r = Math.max(0, Math.ceil((restEnd - Date.now()) / 1000)); $('rf-t').textContent = fmt(r); RO.innerHTML = `<span class="text-xs font-bold">${fmt(r)}</span>`; if (r <= 0) stopRest(true); }
-function startRest(s) { AC ||= new (window.AudioContext || window.webkitAudioContext)(); AC.resume?.(); clearInterval(restInt); restEnd = Date.now() + s * 1000; showRest(false); fullRest(true); tick(); restInt = setInterval(tick, 250); }
-RO.onclick = () => restEnd ? fullRest(true) : showRest(true); $('rest-x').onclick = () => showRest(false);
-document.querySelectorAll('.rs').forEach(b => b.onclick = () => startRest(+b.dataset.s));
-$('rf-p').onclick = () => { restEnd += 15000; tick(); }; $('rf-m').onclick = () => { restEnd -= 15000; tick(); };
-$('rf-skip').onclick = () => stopRest(false); $('rf-min').onclick = () => fullRest(false);
-
+function tick() {
+  const r = Math.max(0, Math.ceil((restEnd - Date.now()) / 1000)); $('rf-t').textContent = fmt(r); RO.innerHTML = `<span class="text-xs font-bold">${fmt(r)}</span>`;
+  if (r > 0 && r <= 3 && r !== lastSec) { lastSec = r; beep(660, .15); navigator.vibrate?.(120); }
+  if (r <= 0) stopRest(true);
+}
+function startRest(s) {
+  AC ||= new (window.AudioContext || window.webkitAudioContext)(); AC.resume?.(); clearInterval(restInt); clearTimeout(endTO); lastSec = -1;
+  restEnd = Date.now() + s * 1000; showRest(false); fullRest(true); wake(true); tick(); restInt = setInterval(tick, 250);
+  endTO = setTimeout(tick, s * 1000 + 60);
+}
 /* ---------- Save ---------- */
 $('wk-finish').onclick = async () => {
   const a = S.active; if (!a) return; const btn = $('wk-finish'), label = btn.textContent;
@@ -983,18 +1029,17 @@ $('wk-finish').onclick = async () => {
 };
 async function saveRoutine() {
   const a = S.active, ex = S.routines.find(r => r.id === a.id);
-  const data = { name: a.name, order: ex ? ex.order || 0 : S.routines.length, exercises: a.exercises.map(e => ({ name: e.name, ss: e.ss || '', sets: e.sets.map(s => ({ kg: s.kg, reps: s.reps })) })) };
+  const data = { name: a.name, order: ex ? ex.order || 0 : S.routines.length, exercises: a.exercises.map(e => ({ name: e.name, ss: e.ss || '', uni: !!e.uni, sets: e.sets.map(s => ({ kg: s.kg, reps: s.reps, ...(e.uni ? { reps2: s.reps2 ?? '' } : {}) })) })) };
   await setDoc(ref('routines', a.id), data); const item = { id: a.id, ...data };
   if (ex) S.routines[S.routines.indexOf(ex)] = item; else S.routines.push(item);
   closeOverlay(true); toast('Η ρουτίνα αποθηκεύτηκε');
 }
 async function saveWorkout() {
   const a = S.active; let vol = 0; const exs = [];
-  a.exercises.forEach(e => { const d = e.sets.filter(s => s.done); if (d.length) { d.forEach(s => vol += (parseFloat(s.kg) || 0) * (parseInt(s.reps) || 0)); exs.push({ name: e.name || 'Χωρίς όνομα', ss: e.ss || '', sets: d.map(s => ({ kg: parseFloat(s.kg) || 0, reps: parseInt(s.reps) || 0 })) }); } });
-  if (!exs.length) { await ask('Καμία ολοκληρωμένη σειρά', 'Τσέκαρε τα σετ που έκανες για να αποθηκευτεί η προπόνηση.', [['Εντάξει', 'ok', 'pri']]); return; }
+  a.exercises.forEach(e => { const d = e.sets.filter(s => s.done); if (d.length) { d.forEach(s => vol += (parseFloat(s.kg) || 0) * (e.uni ? tr(s) : (parseInt(s.reps) || 0))); exs.push({ name: e.name || 'Χωρίς όνομα', ss: e.ss || '', uni: !!e.uni, sets: d.map(s => ({ kg: parseFloat(s.kg) || 0, reps: parseInt(s.reps) || 0, ...(e.uni ? { reps2: parseInt(s.reps2) || 0 } : {}) })) }); } });  if (!exs.length) { await ask('Καμία ολοκληρωμένη σειρά', 'Τσέκαρε τα σετ που έκανες για να αποθηκευτεί η προπόνηση.', [['Εντάξει', 'ok', 'pri']]); return; }
   const id = gid(), wk = { name: a.name, date: Date.now(), duration: Date.now() - a.startTime, volume: vol, sessionNumber: S.workouts.length + 1, exercises: exs, note: (a.note || '').trim() };
   const sub = P().subscription - 1, tv = (P().totalVolume || 0) + vol;
-  const batch = writeBatch(db); batch.set(ref('workouts', id), wk); batch.set(profRef(), { subscription: sub, totalVolume: tv }, { merge: true }); await batch.commit();
+  const batch = writeBatch(db); batch.set(ref('workouts', id), wk); batch.set(profRef(), { subscription: sub, totalVolume: tv }, { merge: true }); await batch.commit(); logSub('workout', sub + 1, sub);
   S.workouts.unshift({ id, ...wk }); P().subscription = sub; P().totalVolume = tv;
   closeOverlay(true); go('dash'); celebrate();
 }
@@ -1046,7 +1091,7 @@ function renderPR(inScope) {
   let bk, br, bv, n = 0;
   S.workouts.forEach(wo => { let hit = 0;
     (wo.exercises || []).forEach(e => { const nm = (e.name || '').trim(); if (!nm || !inScope(nm)) return; hit = 1;
-      (e.sets || []).forEach(s => { const o = { n: nm, kg: +s.kg || 0, r: +s.reps || 0, d: wo.date };
+      (e.sets || []).forEach(s => { const o = { n: nm, kg: +s.kg || 0, r: rp(s), d: wo.date };
         if (!bk || o.kg > bk.kg || (o.kg === bk.kg && o.r > bk.r)) bk = o;
         if (!br || o.r > br.r || (o.r === br.r && o.kg > br.kg)) br = o;
         if (!bv || o.kg * o.r > bv.kg * bv.r) bv = o; }); });
@@ -1068,10 +1113,10 @@ function renderProg() {
   $('pg-e').value = PG.e; $('pg-set').checked = PG.set; $('pg-prc').checked = PG.pr;
   const cut = PG.r ? Date.now() - PG.r * 864e5 : 0, EX = new Map();
   S.workouts.filter(w => w.date >= cut).sort((a, b) => a.date - b.date).forEach(w => (w.exercises || []).forEach(e => {
-    const n = (e.name || '').trim(), k = n.toLowerCase(), q = (e.sets || []).map(s => ({ kg: +s.kg || 0, r: +s.reps || 0 }));
+    const n = (e.name || '').trim(), k = n.toLowerCase(), q = (e.sets || []).map(s => ({ kg: +s.kg || 0, r: rp(s), t: tr(s) }));
     if (!n || !q.length || !inScope(n)) return;
     let x = EX.get(k); if (!x) EX.set(k, x = { name: n, rows: [] });
-    x.rows.push({ t: w.date, q, kg: Math.max(...q.map(s => s.kg)), reps: Math.max(...q.map(s => s.r)), vol: q.reduce((a, s) => a + s.kg * s.r, 0) });
+    x.rows.push({ t: w.date, q, kg: Math.max(...q.map(s => s.kg)), reps: Math.max(...q.map(s => s.r)), vol: q.reduce((a, s) => a + s.kg * s.t, 0) });
   }));
   renderSum(EX); renderPR(inScope);
   if (chart) { chart.destroy(); chart = null; }
@@ -1091,7 +1136,7 @@ function renderProg() {
     if (PG.set) { r.q.slice(0, 5).forEach((s, j) => { const c = PAL[j], n = 'Σετ ' + (j + 1);
       if (kgOn) add(n + sf('Κιλά'), c, 'y', 0, 'max', key, s.kg, det);
       if (rpOn) add(n + sf('Επαναλήψεις'), c, both ? 'y1' : 'y', both, 'max', key, s.r, det);
-      if (PG.m === 'vol') add(n, c, 'y', 0, 'sum', key, s.kg * s.r, det); }); return; }
+      if (PG.m === 'vol') add(n, c, 'y', 0, 'sum', key, s.kg * s.t, det); }); return; }
     const nm = t => one ? t : `${x.name} · ${t}`, col = (a) => one ? a : PAL[i];
     if (kgOn) add(nm('Κιλά'), col('#ef5350'), 'y', 0, 'max', key, r.kg, det);
     if (rpOn) add(nm('Επαναλήψεις'), col('#42a5f5'), both ? 'y1' : 'y', both, 'max', key, r.reps, det);
@@ -1119,20 +1164,17 @@ $('pg-sum').onclick = e => { const b = e.target.closest('[data-ex]'); if (b) { P
 $('pg-z').onclick = () => { PG.big = !PG.big; $('pg-box').style.height = PG.big ? '480px' : '280px'; $('pg-z').textContent = PG.big ? 'Σμίκρυνση γραφήματος' : 'Μεγέθυνση γραφήματος'; chart?.resize(); };
 /* ---------- Γυμναστές ---------- */
 let CL = [];
+const subBadge = s => s == null ? '<span class="text-xs text-gray-600">—</span>' : `<span class="text-sm font-extrabold px-2.5 py-1 rounded-lg ${s < 0 ? 'bg-red-500/25 text-red-400' : s <= 2 ? 'bg-orange-500/20 text-orange-400' : 'bg-[#26262a] text-gray-200'}">${s}</span>`;
 const rCl = () => { const q = $('cl-q').value.toLowerCase();
-  $('cl-list').innerHTML = CL.filter(c => ((c.name || '') + (c.email || '')).toLowerCase().includes(q)).map(c => `<button data-cl="${c.id}" data-n="${esc(c.name)}" class="w-full bg-[#1c1c1f] rounded-xl p-3 text-left"><b class="text-sm block">${esc(c.name || '—')}</b><span class="text-xs text-gray-500">${esc(c.email || '')}</span></button>`).join('') || '<p class="text-sm text-gray-500 text-center py-3">Κανένας πελάτης.</p>'; };
-$('h-clients').onclick = async () => {
-  try { CL = (await getDocs(collection(db, 'artifacts', APP, 'directory'))).docs.map(d => ({ id: d.id, ...d.data() })).filter(c => !c.deleted).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'el')); }
-  catch { toast('Δεν έχεις πρόσβαση. Έλεγξε τους κανόνες Firestore.'); return; }
-  $('cl-q').value = ''; rCl(); openSheet('sheet-clients');
+  $('cl-list').innerHTML = CL.filter(c => ((c.name || '') + (c.email || '')).toLowerCase().includes(q)).map(c => `<button data-cl="${c.id}" data-n="${esc(c.name)}" class="w-full bg-[#1c1c1f] rounded-xl p-3 text-left flex justify-between items-center gap-3"><span class="min-w-0"><b class="text-sm block truncate">${esc(c.name || '—')}</b><span class="text-xs text-gray-500 truncate block">${esc(c.email || '')}</span></span>${subBadge(c.subs)}</button>`).join('') || '<p class="text-sm text-gray-500 text-center py-3">Κανένας πελάτης.</p>'; 
 };
-$('cl-q').oninput = rCl;
 async function viewClient(id, name) {
   if (S.active) { toast('Τέλειωσε πρώτα την ανοιχτή προπόνηση'); return; }
   viewing = id === user.uid ? null : id; await loadData();
   const v = $('vbar'); v.classList.toggle('hidden', !viewing);
   v.innerHTML = viewing ? `<span>Πελάτης: <b>${esc(name)}</b></span><button id="vb-x" class="font-bold underline">Επιστροφή</button>` : '';
   $('s-delwrap').classList.toggle('hidden', !viewing);
+  lastDirSubs = null;
   refresh(); go('dash');
 }
 $('cl-list').onclick = e => { const b = e.target.closest('[data-cl]'); if (b) { closeSheet('sheet-clients'); viewClient(b.dataset.cl, b.dataset.n); } };
@@ -1147,7 +1189,7 @@ async function deleteClient() {
   const r2 = await ask('Είσαι σίγουρος;', 'Η ενέργεια δεν αναιρείται.', [['Ναι, διαγραφή', 'y', 'dng'], ['Άκυρο', 'n']]);
   if (r2 !== 'y') return;
   try {
-    for (const n of ['workouts', 'routines', 'calendar', 'renewals', 'profile']) {
+    for (const n of ['workouts','routines','calendar','renewals','subLog','profile']) {
       const s = await getDocs(collection(db, 'artifacts', APP, 'users', id, n));
       await Promise.all(s.docs.map(d => deleteDoc(d.ref)));
     }
@@ -1201,7 +1243,7 @@ $('s-notif').onclick = async () => {
 document.addEventListener('visibilitychange', () => {
   if (!canN() || Notification.permission !== 'granted' || !SWR) return;
   if (document.hidden) { if (S.active && !S.active.isRoutine) SWR.showNotification('Η προπόνησή σου τρέχει 💪', { body: 'Πάτα για να επιστρέψεις: ' + S.active.name, tag: 'wk', icon: 'icons/icon-192.png', requireInteraction: true }); }
-  else SWR.getNotifications({ tag: 'wk' }).then(l => l.forEach(n => n.close()));
+  else SWR.getNotifications().then(l => l.forEach(n => n.close()));
 });
 async function checkDraft() {
   const d = localStorage.getItem(draftKey()); if (!d || S.active || viewing) return;
