@@ -172,16 +172,37 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;displa
     </section>
 <!-- TEST GRAFIMA -->
     <section id="v-prog" class="view hidden space-y-3">
-     <h2 class="text-2xl font-bold">Πρόοδος</h2>
-     <div class="card p-4 space-y-2">
-     <div class="grid grid-cols-2 gap-2">
-      <select id="pg-g" class="inp"><option>Όλες</option><option>Στήθος</option><option>Πλάτη</option><option>Πόδια</option><option>Ώμοι</option><option>Χέρια</option><option>Κορμός</option><option>Άλλο</option></select>
-      <select id="pg-m" class="inp"><option value="both">Κιλά & επαναλήψεις</option><option value="kg">Μέγιστα κιλά</option><option value="reps">Επαναλήψεις</option><option value="vol">Όγκος</option></select>
-     </div>
-     <select id="pg-e" class="inp"></select>
-     <div style="height:280px"><canvas id="pg-c"></canvas></div>
-     <p id="pg-empty" class="hidden text-center text-sm text-gray-500 py-6">Δεν υπάρχουν δεδομένα για αυτή την επιλογή.</p>
-     </div>
+    <h2 class="text-2xl font-bold">Πρόοδος</h2>
+    <div class="card p-4 space-y-3">
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="lbl">Χρονικό εύρος</label>
+          <select id="pg-r" class="inp"><option value="30">1 μήνας</option><option value="90">3 μήνες</option><option value="180">6 μήνες</option><option value="365">1 έτος</option><option value="0" selected>Όλα</option></select></div>
+        <div><label class="lbl">Ομαδοποίηση</label>
+          <select id="pg-b" class="inp"><option value="s">Ανά προπόνηση</option><option value="wk">Ανά εβδομάδα</option><option value="mo">Ανά μήνα</option></select></div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="lbl">Προβολή</label>
+          <select id="pg-v" class="inp"><option value="tot">Συνολικά</option><option value="set">Ανά σετ (1ο, 2ο, 3ο…)</option><option value="grp">Σύγκριση μυϊκών ομάδων</option></select></div>
+        <div><label class="lbl">Μέτρηση</label>
+          <select id="pg-m" class="inp"><option value="both">Κιλά & επαναλήψεις</option><option value="kg">Μέγιστα κιλά</option><option value="reps">Επαναλήψεις</option><option value="vol">Όγκος</option><option value="rm">Εκτιμώμενο 1RM</option></select></div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="lbl">Μυϊκή ομάδα</label>
+          <select id="pg-g" class="inp"><option>Όλες</option><option>Στήθος</option><option>Πλάτη</option><option>Πόδια</option><option>Ώμοι</option><option>Χέρια</option><option>Κορμός</option><option>Άλλο</option></select></div>
+        <div><label class="lbl">Άσκηση</label><select id="pg-e" class="inp"></select></div>
+      </div>
+      <div class="flex items-center justify-between">
+        <label class="flex items-center gap-2 text-sm text-gray-300"><input id="pg-prc" type="checkbox" class="set-checkbox" style="width:24px;height:24px" checked> Σήμανση ρεκόρ</label>
+        <button id="pg-z" class="text-xs font-bold text-brand-light bg-[#1c1c1f] border border-[#2c2c30] rounded-lg px-3 py-2"><i class="ph ph-arrows-out-simple"></i> <span id="pg-z-t">Μεγέθυνση</span></button>
+      </div>
+      <div id="pg-box" style="height:280px"><canvas id="pg-c"></canvas></div>
+      <p id="pg-empty" class="hidden text-center text-sm text-gray-500 py-6"></p>
+      <p class="text-[11px] text-gray-500">Το χρυσό αστέρι σημαίνει νέο προσωπικό ρεκόρ για τη συγκεκριμένη γραμμή. Στην προβολή «Ανά σετ» διάλεξε άσκηση.</p>
+    </div>
+    <div id="pg-prw" class="card p-4 hidden">
+      <h3 class="font-semibold mb-3">Προσωπικά ρεκόρ</h3>
+      <div id="pg-prs" class="grid grid-cols-2 gap-2"></div>
+    </div>
     </section>
 
 
@@ -245,6 +266,7 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;displa
     <div class="flex-1 min-w-0 text-center"><input id="wk-title" class="bg-transparent text-center font-bold text-lg w-full outline-none"><div id="wk-clock" class="text-xs text-brand-light font-semibold"><span id="wk-time">00:00</span></div></div>
     <button id="wk-finish" class="btn pri !w-auto !py-2 !px-5 !rounded-full text-sm">Τέλος</button>
   </header>
+  <div id="wk-notewrap" class="px-4 pt-3"><textarea id="wk-note" rows="2" class="inp" placeholder="Σημειώσεις προπόνησης"></textarea></div>
   <div id="wk-ex" class="flex-1 overflow-y-auto hide-scroll p-4 space-y-4" style="padding-bottom:160px"></div>
   <div class="absolute bottom-0 left-0 w-full p-4 bg-[#0c0c0d]/95 border-t border-[#26262a]" style="padding-bottom:calc(16px + var(--sb))">
     <button id="wk-add" class="btn flex items-center justify-center gap-2"><i class="ph ph-plus text-brand-light"></i>Προσθήκη άσκησης</button>
@@ -268,6 +290,11 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;displa
   </div>
   <div class="grid grid-cols-3 text-center py-3 border-b border-[#26262a] text-sm">
     <div><p class="text-[10px] text-gray-500">ΟΓΚΟΣ</p><b id="de-v"></b></div><div class="border-x border-[#26262a]"><p class="text-[10px] text-gray-500">ΔΙΑΡΚΕΙΑ</p><b id="de-m"></b></div><div><p class="text-[10px] text-gray-500">ΣΥΝΕΔΡΙΑ</p><b class="text-brand-light" id="de-n"></b></div>
+  </div>
+  <div class="px-4 pt-3 pb-3 space-y-2 border-b border-[#26262a]">
+  <label class="lbl">Σημειώσεις</label>
+  <textarea id="de-note" rows="2" class="inp" placeholder="Πρόσθεσε σημείωση"></textarea>
+  <button id="de-note-save" class="btn !py-2 !text-sm">Αποθήκευση σημείωσης</button>
   </div>
   <div id="de-ex" class="flex-1 overflow-y-auto hide-scroll p-4 space-y-3 pb-10"></div>
 </div></div>
@@ -303,7 +330,7 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;displa
   <div class="flex justify-between items-center mb-2"><span id="hp-n" class="text-xs text-gray-500"></span><button data-close="sheet-help" class="w-8 h-8 rounded-full bg-[#1c1c1f] text-gray-400"><i class="ph ph-x"></i></button></div>
   <div id="hp-i" class="w-20 h-20 mx-auto rounded-3xl bg-brand/15 flex items-center justify-center text-brand-light text-4xl mb-3"></div>
   <h3 id="hp-t" class="text-xl font-bold mb-1"></h3>
-  <p id="hp-d" class="text-sm text-gray-400" style="min-height:96px"></p>
+  <p id="hp-d" class="text-sm text-gray-400" style="min-height:140px"></p>
   <p id="hp-a" class="text-brand-light text-sm font-semibold my-2"></p>
   <div class="grid grid-cols-2 gap-3"><button id="hp-b" class="btn">Πίσω</button><button id="hp-nx" class="btn pri">Επόμενο</button></div>
 </div></div>
@@ -619,7 +646,7 @@ function renderHistory() {
     if (it.t === 'r') { out += `<button data-rn="${it.r.id}" class="w-full text-left rounded-2xl p-3 flex items-center gap-3 border border-dashed border-brand-light bg-brand/10"><i class="ph-fill ph-credit-card text-2xl text-brand-light"></i><div><b class="text-sm">Ανανέωση πακέτου</b><span class="block text-xs text-gray-400">${new Date(it.d).toLocaleDateString('el-GR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} · +${it.r.n} συνεδρίες</span></div></button>`; return; }
     const w = it.w, { k, no } = PK[w.id];
     if (k !== pk) { pk = k; out += `<div class="text-[11px] font-bold text-brand-light mt-3 pl-1">ΠΑΚΕΤΟ ${k}</div>`; }
-    out += `<button data-hw="${w.id}" class="card w-full p-4 flex justify-between items-center text-left"><div><div class="flex items-center gap-2"><b>${esc(w.name)}</b><span class="text-[10px] bg-brand/10 text-brand-light px-1.5 py-0.5 rounded font-bold">#${no}/${size}</span>${no === 1 ? '<span class="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-bold">ΑΡΧΗ ΠΑΚΕΤΟΥ</span>' : ''}</div><span class="text-xs text-gray-500">${new Date(w.date).toLocaleDateString('el-GR', { weekday: 'short', day: 'numeric', month: 'short' })} ${w.time ? ' · ' + w.time : ''}· ${(w.exercises || []).length} ασκήσεις</span></div><div class="text-right"><b class="text-lg">${w.volume.toLocaleString('el-GR')}</b><span class="block text-[10px] text-gray-500">${w.duration ? Math.round(w.duration / 60000) + ' λεπτά' : 'καταχώρηση'}</span></div></button>`;
+    out += `<button data-hw="${w.id}" class="card w-full p-4 flex justify-between items-center text-left"><div><div class="flex items-center gap-2"><b>${esc(w.name)}</b><span class="text-[10px] bg-brand/10 text-brand-light px-1.5 py-0.5 rounded font-bold">#${no}/${size}</span>${no === 1 ? '<span class="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-bold">ΑΡΧΗ ΠΑΚΕΤΟΥ</span>' : ''}</div><span class="text-xs text-gray-500">${new Date(w.date).toLocaleDateString('el-GR', { weekday: 'short', day: 'numeric', month: 'short' })} ${w.time ? ' · ' + w.time : ''}· ${(w.exercises || []).length} ασκήσεις${w.note ? ' · σημείωση' : ''}</span></div><div class="text-right"><b class="text-lg">${w.volume.toLocaleString('el-GR')}</b><span class="block text-[10px] text-gray-500">${w.duration ? Math.round(w.duration / 60000) + ' λεπτά' : 'καταχώρηση'}</span></div></button>`;
   });
   $('hi-list').innerHTML = tot ? out : '<p class="text-center text-gray-500 py-10">Δεν υπάρχει ιστορικό ακόμα.</p>';
 }
@@ -637,6 +664,11 @@ function openDetail(w) {
   $('de-t').textContent = w.name; $('de-d').textContent = new Date(w.date).toLocaleDateString('el-GR', { weekday: 'long', day: 'numeric', month: 'long' });
   $('de-v').textContent = w.volume.toLocaleString('el-GR') + ' kg'; $('de-m').textContent = (w.duration ? Math.round(w.duration / 60000) + ' λ' : '—'); { const q = pkgInfo()[w.id]; $('de-n').textContent = q ? '#' + q.no + '/' + (P().planSize || 12) : '-'; }
   $('de-ex').innerHTML = (w.exercises || []).map(ex => `<div class="bg-[#1c1c1f] rounded-2xl p-4"><div class="flex items-center gap-2 mb-2"><b class="text-sm">${esc(ex.name)}</b>${ex.ss ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded" style="background:${SSC[ex.ss]}33;color:${SSC[ex.ss]}">Σούπερ σετ ${ex.ss}</span>` : ''}</div>${ex.sets.map((s, i) => `<div class="flex justify-between text-sm py-1 border-b border-[#26262a] last:border-0"><span class="text-gray-500 text-xs">Σετ ${i + 1}</span><b>${s.kg} kg × ${s.reps}</b></div>`).join('')}</div>`).join('') || '<p class="text-gray-500 text-sm">Καταγράφηκε χωρίς ασκήσεις.</p>';
+  $('de-note').value = w.note || '';
+  $('de-note-save').onclick = async () => {
+    const t = $('de-note').value.trim();
+    try { await setDoc(ref('workouts', w.id), { note: t }, { merge: true }); w.note = t; renderHistory(); toast('Η σημείωση αποθηκεύτηκε'); } catch { toast('Αποτυχία αποθήκευσης'); }
+  };
   $('de-del').onclick = async () => {
     const r = await ask('Διαγραφή προπόνησης', 'Να επιστραφεί και η συνεδρία στο πακέτο;', [['Διαγραφή & επιστροφή συνεδρίας', 'r', 'pri'], ['Διαγραφή μόνο', 'd'], ['Άκυρο', 'n']]);
     if (r === 'n' || !r) return;
@@ -710,13 +742,14 @@ function beginWorkout(rid) {
 }
 function beginUI() {
   $('wk-title').value = S.active.name; $('wk-title').placeholder = 'Όνομα προπόνησης'; $('wk-clock').classList.remove('hidden'); $('wk-finish').textContent = 'Τέλος';
+  $('wk-note').value = S.active.note || ''; $('wk-notewrap').classList.remove('hidden');
   renderEditor(); openOverlay(); draft(); refresh();
 }
 function editRoutine(id) {
   const ex = id && S.routines.find(r => r.id === id);
   S.active = ex ? { ...JSON.parse(JSON.stringify(ex)), isRoutine: true } : { isRoutine: true, id: gid(), name: '', exercises: [] };
   S.active.exercises.forEach(e => e.sets.forEach(s => s.id = s.id || gid())); S.active.exercises.forEach(e => e.id = e.id || gid());
-  $('wk-title').value = S.active.name; $('wk-title').placeholder = 'Όνομα ρουτίνας'; $('wk-clock').classList.add('hidden'); $('wk-finish').textContent = 'Αποθήκευση';
+  $('wk-title').value = S.active.name; $('wk-title').placeholder = 'Όνομα ρουτίνας'; $('wk-clock').classList.add('hidden'); $('wk-notewrap').classList.add('hidden'); $('wk-finish').textContent = 'Αποθήκευση';
   renderEditor(); openOverlay();
 }
 function openOverlay() { openSheet('overlay'); }
@@ -793,6 +826,7 @@ box.addEventListener('click', async e => {
   }
   draft();
 });
+$('wk-note').addEventListener('input', e => { if (S.active) { S.active.note = e.target.value; draft(); } });
 $('wk-add').onclick = () => { if (!S.active) return; S.active.exercises.push(newEx()); renderEditor(); draft(); setTimeout(() => box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' }), 80); };
 if (window.Sortable) new Sortable(box, { animation: 150, handle: '.drag-handle', ghostClass: 'sortable-ghost', onEnd: () => {
   const ids = [...box.querySelectorAll('.ex-card')].map(el => el.dataset.id);
@@ -838,7 +872,7 @@ async function saveWorkout() {
   const a = S.active; let vol = 0; const exs = [];
   a.exercises.forEach(e => { const d = e.sets.filter(s => s.done); if (d.length) { d.forEach(s => vol += (parseFloat(s.kg) || 0) * (parseInt(s.reps) || 0)); exs.push({ name: e.name || 'Χωρίς όνομα', ss: e.ss || '', sets: d.map(s => ({ kg: parseFloat(s.kg) || 0, reps: parseInt(s.reps) || 0 })) }); } });
   if (!exs.length) { await ask('Καμία ολοκληρωμένη σειρά', 'Τσέκαρε τα σετ που έκανες για να αποθηκευτεί η προπόνηση.', [['Εντάξει', 'ok', 'pri']]); return; }
-  const id = gid(), wk = { name: a.name, date: Date.now(), duration: Date.now() - a.startTime, volume: vol, sessionNumber: S.workouts.length + 1, exercises: exs };
+  const id = gid(), wk = { name: a.name, date: Date.now(), duration: Date.now() - a.startTime, volume: vol, sessionNumber: S.workouts.length + 1, exercises: exs, note: (a.note || '').trim() };
   const sub = P().subscription - 1, tv = (P().totalVolume || 0) + vol;
   const batch = writeBatch(db); batch.set(ref('workouts', id), wk); batch.set(profRef(), { subscription: sub, totalVolume: tv }, { merge: true }); await batch.commit();
   S.workouts.unshift({ id, ...wk }); P().subscription = sub; P().totalVolume = tv;
@@ -856,35 +890,96 @@ const GR = [
   ['Πλάτη', /πλατ|row|κωπηλ|lat |pulldown|pull|μονοζυγ|deadlift|τραβηγ/]
 ];
 const grpOf = n => { const k = norm(n); for (const [g, r] of GR) if (r.test(k)) return g; return 'Άλλο'; };
-let chart;
+const GRN = ['Στήθος', 'Πλάτη', 'Πόδια', 'Ώμοι', 'Χέρια', 'Κορμός', 'Άλλο'];
+const PAL = ['#ef5350', '#42a5f5', '#66bb6a', '#ffa726', '#ab47bc', '#26c6da', '#d4e157'], GOLD = '#ffd54f';
+let chart, pgBig = false;
+const mondayOf = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getTime(); };
+const monthOf = t => { const d = new Date(t); return new Date(d.getFullYear(), d.getMonth(), 1).getTime(); };
+const e1rm = (kg, r) => r > 0 ? kg * (1 + r / 30) : 0;
+const bkKey = (b, t) => b === 'mo' ? monthOf(t) : b === 'wk' ? mondayOf(t) : t;
+const bkLbl = (b, k) => b === 'mo' ? new Date(k).toLocaleDateString('el-GR', { month: 'short', year: '2-digit' }) : b === 'wk' ? 'Εβδ ' + fd(k) : fd(k);
+const matches = (name, g, ex) => { const n = (name || '').trim().toLowerCase(); if (!n) return false; if (ex) return n === ex; return g === 'Όλες' || grpOf(n) === g; };
+
+function renderPR(g, ex, v) {
+  const w = $('pg-prw'); if (v === 'grp' || (!ex && g === 'Όλες')) { w.classList.add('hidden'); return; }
+  let bk, br, bv, bm;
+  S.workouts.forEach(wo => (wo.exercises || []).forEach(e => { if (!matches(e.name, g, ex)) return;
+    (e.sets || []).forEach(s => { const kg = +s.kg || 0, r = +s.reps || 0, o = { n: e.name, kg, r, d: wo.date };
+      if (!bk || kg > bk.kg || (kg === bk.kg && r > bk.r)) bk = o;
+      const rm = e1rm(kg, r); if (!bm || rm > bm.x) bm = { ...o, x: rm };
+      if (!br || r > br.r || (r === br.r && kg > br.kg)) br = o;
+      const vv = kg * r; if (!bv || vv > bv.x) bv = { ...o, x: vv };
+    }); }));
+  if (!bk) { w.classList.add('hidden'); return; }
+  const card = (t, o, val) => `<div class="bg-[#1c1c1f] rounded-xl p-3"><p class="text-[10px] text-gray-500 font-bold">${t}</p><b class="text-base">${val}</b><span class="block text-[11px] text-gray-500">${esc(o.n)} · ${fd(o.d)}</span></div>`;
+  $('pg-prs').innerHTML = card('ΜΕΓΙΣΤΑ ΚΙΛΑ', bk, `${bk.kg} kg × ${bk.r}`) + card('ΕΚΤΙΜΩΜΕΝΟ 1RM', bm, `${Math.round(bm.x * 10) / 10} kg`) + card('ΜΕΓΙΣΤΕΣ ΕΠΑΝΑΛΗΨΕΙΣ', br, `${br.r} × ${br.kg} kg`) + card('ΚΑΛΥΤΕΡΟ ΣΕΤ (ΟΓΚΟΣ)', bv, `${Math.round(bv.x)} kg`);
+  w.classList.remove('hidden');
+}
+
 function renderProg() {
   if (!window.Chart) { toast('Το γράφημα δεν φόρτωσε (έλεγξε σύνδεση)'); return; }
-  const g = $('pg-g').value, names = new Map();
+  const g = $('pg-g').value, v = $('pg-v').value, m = $('pg-m').value, b = $('pg-b').value, rng = +$('pg-r').value, pr = $('pg-prc').checked;
+  const names = new Map();
   S.workouts.forEach(w => (w.exercises || []).forEach(e => { const n = (e.name || '').trim(); if (n && (g === 'Όλες' || grpOf(n) === g)) names.set(n.toLowerCase(), n); }));
   const cur = $('pg-e').value;
   $('pg-e').innerHTML = '<option value="">Όλες οι ασκήσεις' + (g === 'Όλες' ? '' : ' (' + g + ')') + '</option>' + [...names.entries()].sort().map(([k, n]) => `<option value="${esc(k)}">${esc(n)}</option>`).join('');
   $('pg-e').value = names.has(cur) ? cur : '';
-  const ex = $('pg-e').value, m = $('pg-m').value, pts = [];
-  [...S.workouts].sort((a, b) => a.date - b.date).forEach(w => {
-    let kg = 0, reps = 0, vol = 0, hit = false;
-    (w.exercises || []).forEach(e => {
-      const n = (e.name || '').trim().toLowerCase(); if (!n) return;
-      if (ex ? n !== ex : (g !== 'Όλες' && grpOf(n) !== g)) return;
-      hit = true; e.sets.forEach(s => { kg = Math.max(kg, s.kg); reps += s.reps; vol += s.kg * s.reps; });
-    });
-    if (hit) pts.push({ d: fd(w.date), kg, reps, vol });
-  });
+  const ex = $('pg-e').value;
+  $('pg-e').disabled = $('pg-g').disabled = v === 'grp';
   if (chart) { chart.destroy(); chart = null; }
-  $('pg-empty').classList.toggle('hidden', !!pts.length); if (!pts.length) return;
-  const D = [], mk = (label, data, c, y) => ({ label, data, borderColor: c, backgroundColor: c, yAxisID: y, tension: .3, pointRadius: 4 });
-  if (m === 'kg' || m === 'both') D.push(mk('Μέγιστα κιλά', pts.map(p => p.kg), '#ef5350', 'y'));
-  if (m === 'reps' || m === 'both') D.push(mk('Επαναλήψεις', pts.map(p => p.reps), '#42a5f5', m === 'both' ? 'y1' : 'y'));
-  if (m === 'vol') D.push(mk('Όγκος (kg)', pts.map(p => p.vol), '#66bb6a', 'y'));
-  const ax = (extra = {}) => ({ ticks: { color: '#8e8e93' }, grid: { color: '#26262a' }, ...extra });
-  chart = new Chart($('pg-c'), { type: 'line', data: { labels: pts.map(p => p.d), datasets: D },
-    options: { maintainAspectRatio: false, scales: { x: ax(), y: ax(), y1: ax({ display: m === 'both', position: 'right', grid: { drawOnChartArea: false } }) }, plugins: { legend: { labels: { color: '#f5f5f7' } } } } });
+  const showMsg = txt => { $('pg-empty').textContent = txt; $('pg-empty').classList.toggle('hidden', !txt); $('pg-box').classList.toggle('hidden', !!txt); };
+  if (v === 'set' && !ex) { showMsg('Διάλεξε μια συγκεκριμένη άσκηση για να δεις τα σετ της.'); renderPR(g, ex, v); return; }
+
+  const cut = rng ? Date.now() - rng * 864e5 : 0;
+  const W = S.workouts.filter(w => w.date >= cut).sort((a, b) => a.date - b.date);
+  const SR = new Map();
+  const add = (name, ax, key, val, agg, det) => {
+    let s = SR.get(name); if (!s) SR.set(name, s = { ax, pts: new Map() });
+    const p = s.pts.get(key);
+    if (!p) s.pts.set(key, { v: val, det: det ? [det] : [] });
+    else { p.v = agg === 'max' ? Math.max(p.v, val) : p.v + val; if (det) p.det.push(det); }
+  };
+  W.forEach(w => (w.exercises || []).forEach(e => {
+    const n = (e.name || '').trim().toLowerCase(); if (!n) return;
+    const key = bkKey(b, w.date), sets = e.sets || [];
+    if (v === 'grp') {
+      const gn = grpOf(n);
+      sets.forEach(s => { const kg = +s.kg || 0, r = +s.reps || 0;
+        const val = m === 'reps' ? r : m === 'vol' ? kg * r : m === 'rm' ? e1rm(kg, r) : kg;
+        add(gn, 'y', key, val, (m === 'reps' || m === 'vol') ? 'sum' : 'max'); });
+    } else if (matches(n, g, ex)) {
+      sets.forEach((s, i) => { const kg = +s.kg || 0, r = +s.reps || 0, det = `${kg}kg×${r}`;
+        if (v === 'set') { if (i < 6) add('Σετ ' + (i + 1), 'y', key, m === 'reps' ? r : kg, 'max', det); return; }
+        if (m === 'kg' || m === 'both') add('Μέγιστα κιλά', 'y', key, kg, 'max', det);
+        if (m === 'reps' || m === 'both') add('Επαναλήψεις', m === 'both' ? 'y1' : 'y', key, r, 'sum');
+        if (m === 'vol') add('Όγκος (kg)', 'y', key, kg * r, 'sum', det);
+        if (m === 'rm') add('Εκτιμώμενο 1RM (kg)', 'y', key, e1rm(kg, r), 'max', det);
+      });
+    }
+  }));
+  const keys = [...new Set([...SR.values()].flatMap(s => [...s.pts.keys()]))].sort((a, b) => a - b);
+  renderPR(g, ex, v);
+  if (!keys.length) { showMsg('Δεν υπάρχουν δεδομένα για αυτή την επιλογή.'); return; }
+  showMsg('');
+  const D = []; let ci = 0;
+  SR.forEach((s, name) => {
+    const c = v === 'grp' ? PAL[GRN.indexOf(name) % PAL.length] : PAL[ci++ % PAL.length];
+    const data = keys.map(k => s.pts.has(k) ? Math.round(s.pts.get(k).v * 10) / 10 : null);
+    let best = -Infinity;
+    const prs = data.map(x => { if (x == null) return false; const is = pr && isFinite(best) && x > best; if (x > best) best = x; return is; });
+    D.push({ label: name, data, yAxisID: s.ax, borderColor: c, backgroundColor: c, tension: .3, spanGaps: true, borderWidth: 2,
+      pointRadius: prs.map(p => p ? 8 : keys.length > 40 ? 2 : 4), pointStyle: prs.map(p => p ? 'star' : 'circle'),
+      pointBackgroundColor: prs.map(p => p ? GOLD : c), pointBorderColor: prs.map(p => p ? GOLD : c),
+      det: keys.map(k => s.pts.get(k)?.det || []) });
+  });
+  const ax = (x = {}) => ({ ticks: { color: '#8e8e93' }, grid: { color: '#26262a' }, ...x });
+  chart = new Chart($('pg-c'), { type: 'line', data: { labels: keys.map(k => bkLbl(b, k)), datasets: D },
+    options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      scales: { x: ax({ ticks: { color: '#8e8e93', maxRotation: 0, autoSkip: true } }), y: ax(), y1: ax({ display: D.some(d => d.yAxisID === 'y1'), position: 'right', grid: { drawOnChartArea: false } }) },
+      plugins: { legend: { labels: { color: '#f5f5f7' } }, tooltip: { callbacks: { afterLabel: c => { const d = c.dataset.det?.[c.dataIndex]; return d && d.length ? d.slice(0, 6).join(' · ') : ''; } } } } } });
 }
-['pg-g', 'pg-e', 'pg-m'].forEach(i => $(i).onchange = renderProg);
+['pg-r', 'pg-b', 'pg-v', 'pg-m', 'pg-g', 'pg-e', 'pg-prc'].forEach(i => $(i).onchange = renderProg);
+$('pg-z').onclick = () => { pgBig = !pgBig; $('pg-box').style.height = pgBig ? '480px' : '280px'; $('pg-z-t').textContent = pgBig ? 'Σμίκρυνση' : 'Μεγέθυνση'; chart?.resize(); };
 
 /* ---------- Γυμναστές ---------- */
 let CL = [];
@@ -907,26 +1002,38 @@ $('cl-list').onclick = e => { const b = e.target.closest('[data-cl]'); if (b) { 
 $('vbar').onclick = e => { if (e.target.id === 'vb-x') viewClient(user.uid); };
 
 /* ---------- Οδηγίες χρήσης ---------- */
+/* ---------- Οδηγίες χρήσης ---------- */
+// [εικονίδιο, τίτλος, περιγραφή, εικονίδιο-βέλος, πού βρίσκεται, (προαιρετικά) 'tr' = μόνο για γυμναστές]
 const HELP = [
-  ['ph-barbell', 'Καλώς ήρθες στο Fit', 'Καταγράφεις προπονήσεις, βλέπεις πρόοδο και παρακολουθείς τις συνεδρίες του πακέτου σου. Πάτα Επόμενο για μια γρήγορη ξενάγηση.', ''],
-  ['ph-squares-four', 'Αρχική', 'Δείχνει πόσες συνεδρίες απομένουν (κύκλος), το βάρος σου, τον συνολικό όγκο και τις επόμενες προπονήσεις.', '⬇ Κουμπί «Αρχική» κάτω αριστερά'],
-  ['ph-calendar-check', 'Ημερολόγιο', 'Πάτα μια μέρα. Μπορείς να καταγράψεις προπόνηση που έκανες ή να προγραμματίσεις μελλοντική. Κόκκινη μέρα = έγινε, διακεκομμένη = προγραμματισμένη. Σύρε αριστερά/δεξιά για άλλους μήνες.', '⬆ Στην Αρχική, κάρτα «Δραστηριότητα»'],
-  ['ph-plus', 'Νέα προπόνηση', 'Πάτα το μεγάλο κόκκινο κουμπί. Διάλεξε κενή προπόνηση ή ρουτίνα.', '⬇ Κεντρικό κουμπί +, κάτω στη μέση'],
-  ['ph-check-square', 'Μέσα στην προπόνηση', 'Γράψε κιλά και επαναλήψεις και τσέκαρε ✓ το κάθε σετ. Το «Προηγ. φορά» σου δείχνει τι έκανες την τελευταία φορά. Με το ⋮⋮ μετακινείς ασκήσεις και με το σούπερ σετ τις ενώνεις. Στο τέλος πάτα «Τέλος» για αποθήκευση. Με το βελάκι ⌄ πάνω αριστερά ελαχιστοποιείς.', '⬆ Κουμπί «Τέλος» πάνω δεξιά'],
-  ['ph-timer', 'Διάλειμμα', 'Το στρογγυλό ρολόι κάτω δεξιά ξεκινά χρονόμετρο διαλείμματος (30s–3m) και χτυπά όταν τελειώσει.', '↘ Κάτω δεξιά μέσα στην προπόνηση'],
-  ['ph-clipboard-text', 'Ρουτίνες', 'Φτιάξε έτοιμα προγράμματα με το +. Με ▶ ξεκινάς, με ✎ επεξεργάζεσαι, με 🗑 διαγράφεις.', '⬇ «Ρουτίνες» κάτω'],
-  ['ph-chart-line-up', 'Πρόοδος', 'Γράφημα για κιλά και επαναλήψεις ανά μυϊκή ομάδα (Στήθος, Πλάτη, Πόδια…) ή ανά συγκεκριμένη άσκηση.', '⬇ «Πρόοδος» κάτω δεξιά'],
-  ['ph-clock-counter-clockwise', 'Ιστορικό', 'Όλες οι προπονήσεις ανά πακέτο. Πάτα μία για λεπτομέρειες ή διαγραφή. Πάτα την ανανέωση για να τη σβήσεις.', '⬇ «Ιστορικό» κάτω δεξιά'],
-  ['ph-user', 'Προφίλ & ασφάλεια', 'Αλλάζεις στοιχεία, συνεδρίες, PIN, εξαγωγή σε Excel και ειδοποίηση επιστροφής στην προπόνηση.', '↗ Ο κύκλος με το αρχικό πάνω δεξιά'],
-  ['ph-bell-ringing', 'Επιστροφή στην προπόνηση', 'Ενεργοποίησέ το από Προφίλ → Ειδοποίηση. Αν βγεις από την εφαρμογή στη μέση προπόνησης, θα δεις ειδοποίηση. Πάτα την για να γυρίσεις ακριβώς εκεί που ήσουν.', '']
+  ['ph-barbell', 'Καλώς ήρθες στο Fit', 'Καταγράφεις προπονήσεις, παρακολουθείς την πρόοδό σου και τις συνεδρίες του πακέτου σου. Πάτα «Επόμενο» για μια σύντομη ξενάγηση σε όλες τις λειτουργίες.', '', ''],
+  ['ph-squares-four', 'Αρχική', 'Δείχνει πόσες συνεδρίες απομένουν (κύκλος), το βάρος σου, τον συνολικό όγκο που έχεις σηκώσει και τις επόμενες προγραμματισμένες προπονήσεις.', 'ph-arrow-down-left', 'Κάτω αριστερά, «Αρχική»'],
+  ['ph-calendar-check', 'Ημερολόγιο', 'Πάτα οποιαδήποτε μέρα για να καταγράψεις προπόνηση που έκανες ή να προγραμματίσεις μελλοντική. Η κόκκινη μέρα σημαίνει ότι έγινε προπόνηση και η διακεκομμένη ότι είναι προγραμματισμένη. Σύρε αριστερά ή δεξιά για άλλους μήνες.', 'ph-arrow-up', 'Αρχική, κάρτα «Δραστηριότητα»'],
+  ['ph-plus-circle', 'Νέα προπόνηση', 'Πάτα το μεγάλο κόκκινο κουμπί. Διάλεξε κενή προπόνηση ή μια έτοιμη ρουτίνα και η προπόνηση ξεκινά αμέσως.', 'ph-arrow-down', 'Κεντρικό κουμπί, κάτω στη μέση'],
+  ['ph-list-checks', 'Καταγραφή σετ', 'Γράψε κιλά και επαναλήψεις και μετά πάτα το τετράγωνο δεξιά για να ολοκληρωθεί το σετ. Κάτω από κάθε σετ βλέπεις τι έκανες την προηγούμενη φορά, και με το κουμπί «Αντιγραφή» τα συμπληρώνεις αυτόματα. Μόνο τα τσεκαρισμένα σετ αποθηκεύονται.', 'ph-arrow-right', 'Δεξιά από κάθε σετ'],
+  ['ph-link', 'Σούπερ σετ και σειρά', 'Από το μενού κάτω από το όνομα της άσκησης διαλέγεις γράμμα (A, B, C, D). Ασκήσεις με το ίδιο γράμμα ενώνονται σε σούπερ σετ και παίρνουν το ίδιο χρώμα. Με τις τελείες αριστερά σέρνεις μια άσκηση για να αλλάξεις τη σειρά.', 'ph-arrow-up-left', 'Μέσα στην κάρτα της άσκησης'],
+  ['ph-note-pencil', 'Σημειώσεις', 'Πάνω από τις ασκήσεις γράφεις σημείωση για την προπόνηση, για παράδειγμα ότι σε πονούσε το χέρι. Μπορείς να τη διορθώσεις ή να τη γράψεις και αργότερα, ανοίγοντας την προπόνηση από το Ιστορικό.', 'ph-arrow-up', 'Μέσα στην προπόνηση, κάτω από τον τίτλο'],
+  ['ph-timer', 'Διάλειμμα', 'Το στρογγυλό κουμπί με το ρολόι ξεκινά χρονόμετρο διαλείμματος από 30 δευτερόλεπτα έως 3 λεπτά και ηχεί όταν τελειώσει. Μπορείς να προσθέσεις ή να αφαιρέσεις 15 δευτερόλεπτα.', 'ph-arrow-down-right', 'Κάτω δεξιά, μέσα στην προπόνηση'],
+  ['ph-caret-down', 'Ελαχιστοποίηση και συνέχεια', 'Με το βελάκι πάνω αριστερά κρύβεις την προπόνηση χωρίς να χαθεί τίποτα. Το κεντρικό κουμπί γίνεται «play» και σε γυρίζει πίσω. Αν κλείσει η εφαρμογή, την επόμενη φορά σου προτείνει να συνεχίσεις.', 'ph-arrow-up-left', 'Πάνω αριστερά, μέσα στην προπόνηση'],
+  ['ph-clipboard-text', 'Ρουτίνες', 'Φτιάξε έτοιμα προγράμματα με το κουμπί +. Το κουμπί play ξεκινά την ρουτίνα, το μολύβι την επεξεργάζεται και ο κάδος τη διαγράφει.', 'ph-arrow-down', 'Κάτω, «Ρουτίνες»'],
+  ['ph-chart-line-up', 'Πρόοδος', 'Δες πώς αλλάζουν τα κιλά και οι επαναλήψεις σου. Διάλεξε χρονικό εύρος (ένας μήνας έως όλα), ομαδοποίηση ανά προπόνηση, εβδομάδα ή μήνα, και μυϊκή ομάδα ή συγκεκριμένη άσκηση. Στην προβολή «Ανά σετ» βλέπεις χωριστή γραμμή για το 1ο, 2ο, 3ο σετ, ενώ η «Σύγκριση μυϊκών ομάδων» βάζει όλες τις ομάδες στο ίδιο γράφημα. Το χρυσό αστέρι σημαίνει νέο ρεκόρ και από κάτω βλέπεις τα προσωπικά σου ρεκόρ.', 'ph-arrow-down-right', 'Κάτω, δεξιά από το κεντρικό κουμπί'],
+  ['ph-clock-counter-clockwise', 'Ιστορικό', 'Όλες οι προπονήσεις ταξινομημένες ανά πακέτο. Πάτα μία για να δεις τις ασκήσεις και τα σετ, να γράψεις σημείωση ή να τη διαγράψεις. Οι ανανεώσεις πακέτου εμφανίζονται με διακεκομμένο περίγραμμα.', 'ph-arrow-down-right', 'Κάτω δεξιά, «Ιστορικό»'],
+  ['ph-user', 'Προφίλ και ασφάλεια', 'Αλλάζεις τα στοιχεία σου, τις συνεδρίες και το πακέτο, ορίζεις PIN, ενεργοποιείς την ειδοποίηση επιστροφής στην προπόνηση και εξάγεις τα δεδομένα σε Excel.', 'ph-arrow-up-right', 'Πάνω δεξιά, ο κύκλος με το αρχικό σου'],
+  ['ph-bell-ringing', 'Ειδοποίηση επιστροφής', 'Ενεργοποίησέ την από Προφίλ και μετά «Ειδοποίηση επιστροφής στην προπόνηση». Αν βγεις από την εφαρμογή ή κλειδώσεις το κινητό στη μέση προπόνησης, θα εμφανιστεί ειδοποίηση και πατώντας την γυρνάς ακριβώς εκεί που ήσουν.', '', ''],
+  ['ph-users', 'Πελάτες (γυμναστής)', 'Πάτα το εικονίδιο με τους ανθρώπους, διάλεξε πελάτη και δες ή επεξεργάσου τα πάντα του: προπονήσεις, σημειώσεις, γράφημα προόδου, συνεδρίες και ρουτίνες. Με το «Επιστροφή» στην πάνω μπάρα γυρνάς στον δικό σου λογαριασμό.', 'ph-arrow-up-right', 'Πάνω δεξιά, δίπλα στο ερωτηματικό', 'tr']
 ];
+const HL = () => HELP.filter(h => h[5] !== 'tr' || isTr());
 let hp = 0;
-function showHelp() { const [i, t, d, a] = HELP[hp];
-  $('hp-i').innerHTML = `<i class="ph ${i}"></i>`; $('hp-t').textContent = t; $('hp-d').textContent = d; $('hp-a').textContent = a;
-  $('hp-n').textContent = `${hp + 1} / ${HELP.length}`; $('hp-b').style.visibility = hp ? 'visible' : 'hidden'; $('hp-nx').textContent = hp === HELP.length - 1 ? 'Τέλος' : 'Επόμενο'; }
+function showHelp() {
+  const L = HL(), [i, t, d, wi, wt] = L[hp];
+  $('hp-i').innerHTML = `<i class="ph ${i}"></i>`; $('hp-t').textContent = t; $('hp-d').textContent = d;
+  $('hp-a').innerHTML = wt ? `<i class="ph ${wi} align-middle"></i> ${wt}` : '';
+  $('hp-n').textContent = `${hp + 1} / ${L.length}`;
+  $('hp-b').style.visibility = hp ? 'visible' : 'hidden';
+  $('hp-nx').textContent = hp === L.length - 1 ? 'Τέλος' : 'Επόμενο';
+}
 $('h-help').onclick = () => { hp = 0; showHelp(); openSheet('sheet-help'); };
-$('hp-b').onclick = () => { hp--; showHelp(); };
-$('hp-nx').onclick = () => { if (hp >= HELP.length - 1) closeSheet('sheet-help'); else { hp++; showHelp(); } };
+$('hp-b').onclick = () => { if (hp > 0) { hp--; showHelp(); } };
+$('hp-nx').onclick = () => { if (hp >= HL().length - 1) closeSheet('sheet-help'); else { hp++; showHelp(); } };
 $('h-av').onclick = () => go('settings');
 
 /* ---------- Ειδοποίηση επιστροφής + ανάκτηση προπόνησης ---------- */
