@@ -1019,6 +1019,13 @@ function startRest(s) {
   restEnd = Date.now() + s * 1000; showRest(false); fullRest(true); wake(true); tick(); restInt = setInterval(tick, 250);
   endTO = setTimeout(tick, s * 1000 + 60);
 }
+RO.onclick = () => restEnd ? fullRest(true) : showRest(true);
+$('rest-x').onclick = () => showRest(false);
+document.querySelectorAll('.rs').forEach(b => b.onclick = () => startRest(+b.dataset.s));
+$('rf-p').onclick = () => { if (restEnd) { restEnd += 15000; tick(); } };
+$('rf-m').onclick = () => { if (restEnd) { restEnd -= 15000; tick(); } };
+$('rf-skip').onclick = () => stopRest(false);
+$('rf-min').onclick = () => fullRest(false);
 /* ---------- Save ---------- */
 $('wk-finish').onclick = async () => {
   const a = S.active; if (!a) return; const btn = $('wk-finish'), label = btn.textContent;
@@ -1168,6 +1175,14 @@ const subBadge = s => s == null ? '<span class="text-xs text-gray-600">—</span
 const rCl = () => { const q = $('cl-q').value.toLowerCase();
   $('cl-list').innerHTML = CL.filter(c => ((c.name || '') + (c.email || '')).toLowerCase().includes(q)).map(c => `<button data-cl="${c.id}" data-n="${esc(c.name)}" class="w-full bg-[#1c1c1f] rounded-xl p-3 text-left flex justify-between items-center gap-3"><span class="min-w-0"><b class="text-sm block truncate">${esc(c.name || '—')}</b><span class="text-xs text-gray-500 truncate block">${esc(c.email || '')}</span></span>${subBadge(c.subs)}</button>`).join('') || '<p class="text-sm text-gray-500 text-center py-3">Κανένας πελάτης.</p>'; 
 };
+
+$('h-clients').onclick = async () => {
+  try { CL = (await getDocs(collection(db, 'artifacts', APP, 'directory'))).docs.map(d => ({ id: d.id, ...d.data() })).filter(c => !c.deleted).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'el')); }
+  catch { toast('Δεν έχεις πρόσβαση. Έλεγξε τους κανόνες Firestore.'); return; }
+  $('cl-q').value = ''; rCl(); openSheet('sheet-clients');
+};
+$('cl-q').oninput = rCl;
+
 async function viewClient(id, name) {
   if (S.active) { toast('Τέλειωσε πρώτα την ανοιχτή προπόνηση'); return; }
   viewing = id === user.uid ? null : id; await loadData();
