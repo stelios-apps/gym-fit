@@ -111,8 +111,8 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;displa
 .cel{animation:fadeIn .25s both;transition:opacity .5s}
 .cel-c{animation:spLogo .6s cubic-bezier(.16,1,.3,1) both,glow 1.4s ease-in-out infinite}
 .cel-t{animation:rise .6s .2s both}
-@keyframes flashRB{0%{background:#d32f2f}50%{background:#000}100%{background:#d32f2f}}
-.flash{position:fixed;inset:0;z-index:150;pointer-events:none;opacity:.9;animation:flashRB .5s linear 6}
+@keyframes flashRB{0%{opacity:.85}100%{opacity:0}}
+.flash{position:fixed;inset:0;z-index:150;pointer-events:none;background:#fff;opacity:0;animation:flashRB .45s ease-out 1}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 </style>
 </head>
@@ -368,6 +368,7 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;displa
   <label class="lbl">Σημειώσεις</label>
   <textarea id="de-note" rows="2" class="inp" placeholder="Πρόσθεσε σημείωση"></textarea>
   <button id="de-note-save" class="btn !py-2 !text-sm">Αποθήκευση σημείωσης</button>
+  <button id="de-rt" class="btn !py-2 !text-sm flex items-center justify-center gap-2"><i class="ph ph-clipboard-text text-brand-light"></i>Αποθήκευση ως ρουτίνα</button>
   </div>
   <div id="de-ex" class="flex-1 overflow-y-auto hide-scroll p-4 space-y-3 pb-10"></div>
 </div></div>
@@ -802,6 +803,12 @@ function openDetail(w) {
     const t = $('de-note').value.trim();
     try { await setDoc(ref('workouts', w.id), { note: t }, { merge: true }); w.note = t; renderHistory(); toast('Η σημείωση αποθηκεύτηκε'); } catch { toast('Αποτυχία αποθήκευσης'); }
   };
+  $('de-rt').onclick = async () => {
+    const r = await ask('Αποθήκευση ως ρουτίνα', `Θα δημιουργηθεί η ρουτίνα «${esc(w.name)}» με ${(w.exercises || []).length} ασκήσεις και τα σετ αυτής της προπόνησης.`, [['Αποθήκευση', 'y', 'pri'], ['Άκυρο', 'n']]);
+    if (r !== 'y') return;
+    const id = gid(), data = { name: w.name, order: S.routines.length, exercises: (w.exercises || []).map(e => ({ name: e.name, ss: e.ss || '', uni: !!e.uni, sets: e.sets.map(s => ({ kg: s.kg, reps: s.reps, ...(e.uni ? { reps2: s.reps2 ?? '' } : {}) })) })) };
+    try { await setDoc(ref('routines', id), data); S.routines.push({ id, ...data }); refresh(); toast('Η ρουτίνα αποθηκεύτηκε'); } catch { toast('Αποτυχία αποθήκευσης'); }
+  };
   $('de-del').onclick = async () => {
     const r = await ask('Διαγραφή προπόνησης', 'Να επιστραφεί και η συνεδρία στο πακέτο;', [['Διαγραφή & επιστροφή συνεδρίας', 'r', 'pri'], ['Διαγραφή μόνο', 'd'], ['Άκυρο', 'n']]);
     if (r === 'n' || !r) return;
@@ -1000,18 +1007,18 @@ const fullRest = on => {
 };
 let lastSec = -1, wl = null, endTO;
 function beep(f = 880, d = .6) { try { const o = AC.createOscillator(), g = AC.createGain(); o.connect(g); g.connect(AC.destination); o.frequency.value = f; g.gain.value = .35; o.start(); o.stop(AC.currentTime + d); } catch { } }
-function flash() { const f = document.createElement('div'); f.className = 'flash'; document.body.appendChild(f); setTimeout(() => f.remove(), 3200); }
+function flash() { const f = document.createElement('div'); f.className = 'flash'; document.body.appendChild(f); setTimeout(() => f.remove(), 600); }
 async function wake(on) { try { if (on) wl = await navigator.wakeLock?.request('screen'); else { await wl?.release(); wl = null; } } catch { } }
 function stopRest(done) {
   clearInterval(restInt); clearTimeout(endTO); restEnd = 0; lastSec = -1; fullRest(false); wake(false); RO.innerHTML = '<i class="ph ph-timer text-xl"></i>';
   if (done) {
-    beep(); navigator.vibrate?.([400, 150, 400, 150, 400]); flash(); RO.classList.add('animate-pulse'); setTimeout(() => RO.classList.remove('animate-pulse'), 5000);
+    beep(); navigator.vibrate?.([400, 150, 400, 150, 400]); RO.classList.add('animate-pulse'); setTimeout(() => RO.classList.remove('animate-pulse'), 5000);
     if (document.hidden && SWR && 'Notification' in window && Notification.permission === 'granted') SWR.showNotification('Τέλος διαλείμματος 💪', { body: 'Ώρα για το επόμενο σετ', tag: 'rest', icon: 'icons/icon-192.png', requireInteraction: true, vibrate: [300, 100, 300] });
   }
 }
 function tick() {
   const r = Math.max(0, Math.ceil((restEnd - Date.now()) / 1000)); $('rf-t').textContent = fmt(r); RO.innerHTML = `<span class="text-xs font-bold">${fmt(r)}</span>`;
-  if (r > 0 && r <= 3 && r !== lastSec) { lastSec = r; beep(660, .15); navigator.vibrate?.(120); }
+  if (r > 0 && r <= 3 && r !== lastSec) { lastSec = r; beep(660, .15); navigator.vibrate?.(120); flash(); }
   if (r <= 0) stopRest(true);
 }
 function startRest(s) {
