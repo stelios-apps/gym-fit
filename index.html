@@ -414,7 +414,7 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;displa
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, getFirestore, doc, getDoc, setDoc as fsSet, collection, getDocs, deleteDoc as fsDel, writeBatch as fsBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, getFirestore, doc, getDoc, setDoc as fsSet, collection, getDocs, deleteDoc as fsDel, writeBatch as fsBatch, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 const app = initializeApp({
   apiKey: "AIzaSyC2S2SVWswn_0oHhIhtxAD_wTyMB00ubqE",
@@ -542,7 +542,7 @@ $('a-forgot').onclick = async () => {
   const em = $('a-email').value.trim(); if (!em) { $('a-err').textContent = 'Γράψε πρώτα το email σου.'; $('a-err').classList.remove('hidden'); return; }
   try { await sendPasswordResetEmail(auth, em); toast('Σου στείλαμε email επαναφοράς'); } catch (err) { $('a-err').textContent = errMap[err.code] || err.message; $('a-err').classList.remove('hidden'); }
 };
-const logout = async () => { S.active = null; try { localStorage.removeItem('fe_name'); } catch { } await signOut(auth); location.reload(); };
+const logout = async () => { S.active = null; try { localStorage.removeItem('fe_name'); } catch { } stopLive(); dirUnsub?.(); await signOut(auth); location.reload(); };
 $('s-out').onclick = logout; $('lock-out').onclick = logout;
 
 onAuthStateChanged(auth, async u => {
@@ -565,6 +565,33 @@ async function loadData() {
 }
 const dirSave = () => setDoc(doc(db, 'artifacts', APP, 'directory', tuid()), { name: P().name, subs: P().subscription, plan: P().planSize || 12, ...(viewing ? {} : { email: user.email || '' }) }, { merge: true }).catch(() => {});
 let lastDirSubs = null;
+
+/* ---------- Live ενημέρωση ---------- */
+let unsubs = [], liveT, dirUnsub;
+const stopLive = () => { unsubs.forEach(u => u()); unsubs = []; };
+const liveRefresh = () => { clearTimeout(liveT); liveT = setTimeout(refresh, 150); };
+function startLive() {
+  stopLive();
+  const err = e => console.error(e);
+  unsubs.push(onSnapshot(profRef(), s => {
+    if (!s.exists()) return;
+    S.profile = { ...DEF, ...s.data() }; if (!P().planSize) P().planSize = 12; liveRefresh();
+  }, err));
+  const watch = (n, key, sorter) => unsubs.push(onSnapshot(col(n), s => {
+    const a = s.docs.map(d => ({ id: d.id, ...d.data() })); if (sorter) a.sort(sorter); S[key] = a; liveRefresh();
+  }, err));
+  watch('workouts', 'workouts', (a, b) => b.date - a.date);
+  watch('routines', 'routines', (a, b) => (a.order || 0) - (b.order || 0));
+  watch('calendar', 'cal'); watch('renewals', 'renew'); watch('subLog', 'subLog');
+}
+function startDirLive() {
+  dirUnsub?.(); if (!isTr()) return;
+  dirUnsub = onSnapshot(collection(db, 'artifacts', APP, 'directory'), s => {
+    CL = s.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => !c.deleted).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'el'));
+    if (!$('sheet-clients').classList.contains('hidden')) rCl();
+  }, () => {});
+}
+
 async function boot(u) {
   user = u; viewing = null;
   if (!isTr()) {
@@ -579,7 +606,7 @@ async function boot(u) {
   await loadData(); dirSave();
   $('h-clients').classList.toggle('hidden', !isTr()); $('s-delwrap').classList.add('hidden');
   $('auth').classList.add('hidden'); $('app').classList.remove('hidden'); $('fab').classList.remove('hidden'); $('nav').classList.remove('hidden');
-  refresh(); lockIfNeeded(); checkDraft();
+  refresh(); startLive(); startDirLive(); lockIfNeeded(); checkDraft();
 }
 
 /* ---------- Κλείδωμα: Face ID / Touch ID → PIN → κωδικός λογαριασμού ---------- */
@@ -838,6 +865,7 @@ function renderSubLog() {
 
 /* ---------- Settings ---------- */
 function fillSettings() {
+  if (document.activeElement?.tagName === 'INPUT' && document.activeElement.closest('#v-settings')) return;
   const p = P(); $('s-name').value = p.name || ''; $('s-w').value = p.weight || ''; $('s-h').value = p.height || ''; $('s-dob').value = p.dob || '';
   $('s-subs').value = p.subscription; $('s-plan').value = p.planSize || 12; $('s-cur').textContent = p.subscription;
 }
@@ -1199,7 +1227,7 @@ async function viewClient(id, name) {
   v.innerHTML = viewing ? `<span>Πελάτης: <b>${esc(name)}</b></span><button id="vb-x" class="font-bold underline">Επιστροφή</button>` : '';
   $('s-delwrap').classList.toggle('hidden', !viewing);
   lastDirSubs = null;
-  refresh(); go('dash');
+  startLive(); refresh(); go('dash');
 }
 $('cl-list').onclick = e => { const b = e.target.closest('[data-cl]'); if (b) { closeSheet('sheet-clients'); viewClient(b.dataset.cl, b.dataset.n); } };
 $('vbar').onclick = e => { if (e.target.id === 'vb-x') viewClient(user.uid); };
