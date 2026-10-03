@@ -992,10 +992,12 @@ box.addEventListener('click', async e => {
 });
 $('wk-note').addEventListener('input', e => { if (S.active) { S.active.note = e.target.value; draft(); } });
 $('wk-add').onclick = () => { if (!S.active) return; S.active.exercises.push(newEx()); renderEditor(); draft(); setTimeout(() => box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' }), 80); };
-if (window.Sortable) new Sortable(box, { animation: 150, handle: '.drag-handle', ghostClass: 'sortable-ghost', onEnd: () => {
-  const ids = [...box.querySelectorAll('.ex-card')].map(el => el.dataset.id);
-  S.active.exercises = ids.map(id => S.active.exercises.find(e => e.id === id)); draft();
-} });
+if (window.Sortable) new Sortable(box, { animation: 150, handle: '.drag-handle', draggable: '.ex-card', filter: '.cancel-wk', preventOnFilter: false, ghostClass: 'sortable-ghost',
+  onMove: e => !e.related.classList.contains('cancel-wk'),
+  onEnd: () => {
+    const ids = [...box.querySelectorAll('.ex-card')].map(el => el.dataset.id);
+    S.active.exercises = ids.map(id => S.active.exercises.find(e => e.id === id)); draft();
+  } });
 
 /* Rest timer (manual only) */
 let restInt, restEnd = 0, AC; const RF = $('rest-full'), RO = $('rest-open');
