@@ -920,7 +920,7 @@ $('st-empty').onclick = () => { closeSheet('sheet-start'); beginWorkout(null); }
 const newEx = () => ({ id: gid(), name: '', ss: '', sets: [{ id: gid(), kg: '', reps: '', done: false }] });
 function beginWorkout(rid) {
   const rt = rid && S.routines.find(r => r.id === rid);
-  S.active = { isRoutine: false, id: gid(), name: rt ? rt.name : 'Προπόνηση', startTime: Date.now(), exercises: rt ? rt.exercises.map(e => ({ id: gid(), name: e.name, ss: e.ss || '', uni: !!e.uni, sets: e.sets.map(s => ({ id: gid(), kg: s.kg, reps: s.reps, reps2: s.reps2 ?? '', done: false })) })) : [] };
+  S.active = { isRoutine: false, id: gid(), name: rt ? rt.name : 'Προπόνηση', startTime: Date.now(), routineId: rt ? rt.id : null, exercises: rt ? rt.exercises.map(e => ({ id: gid(), name: e.name, ss: e.ss || '', uni: !!e.uni, sets: e.sets.map(s => ({ id: gid(), kg: s.kg, reps: s.reps, reps2: s.reps2 ?? '', done: false })) })) : [] };
   beginUI();
 }
 function beginUI() {
@@ -1085,9 +1085,27 @@ async function saveWorkout() {
   const sub = P().subscription - 1, tv = (P().totalVolume || 0) + vol;
   const batch = writeBatch(db); batch.set(ref('workouts', id), wk); batch.set(profRef(), { subscription: sub, totalVolume: tv }, { merge: true }); await batch.commit(); logSub('workout', sub + 1, sub);
   S.workouts.unshift({ id, ...wk }); P().subscription = sub; P().totalVolume = tv;
-  closeOverlay(true); go('dash'); celebrate();
+  await offerRoutineUpdate(a, exs); closeOverlay(true); go('dash'); celebrate();
 }
-
+/* ---------- Ενημέρωση ρουτίνας μετά την προπόνηση ---------- */
+async function offerRoutineUpdate(a, exs) {
+  const rt = a.routineId && S.routines.find(r => r.id === a.routineId); if (!rt) return;
+  const n = v => (v === 0 || v === '0' || v == null) ? '' : String(v), key = e => (e.name || '').trim().toLowerCase();
+  const mk = e => ({ name: e.name, ss: e.ss || '', uni: !!e.uni, sets: e.sets.map(s => ({ kg: n(s.kg), reps: n(s.reps), ...(e.uni ? { reps2: n(s.reps2) } : {}) })) });
+  const used = new Set();
+  const merged = rt.exercises.map(old => {
+    const w = exs.find(e => key(e) === key(old) && !used.has(e));
+    if (!w) return old; used.add(w); return mk(w);
+  });
+  exs.forEach(e => { if (!used.has(e)) merged.push(mk(e)); });
+  const sig = L => JSON.stringify(L.map(e => [key(e), !!e.uni, e.ss || '', (e.sets || []).map(s => [n(s.kg), n(s.reps), n(s.reps2)])]));
+  if (sig(merged) === sig(rt.exercises)) return;
+  const r = await ask('Ενημέρωση ρουτίνας', `Η προπόνηση διαφέρει από τη ρουτίνα «${esc(rt.name)}». Να αποθηκευτούν τα νέα κιλά και επαναλήψεις στη ρουτίνα;`, [['Ναι, ενημέρωση', 'y', 'pri'], ['Όχι, όπως ήταν', 'n']]);
+  if (r !== 'y') return;
+  const data = { name: rt.name, order: rt.order || 0, exercises: merged };
+  try { await setDoc(ref('routines', rt.id), data); const i = S.routines.findIndex(x => x.id === rt.id); if (i >= 0) S.routines[i] = { id: rt.id, ...data }; toast('Η ρουτίνα ενημερώθηκε'); }
+  catch { toast('Αποτυχία ενημέρωσης ρουτίνας'); }
+}
 /* ---------- Πρόοδος (γράφημα) ---------- */
 const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 const GR = [
